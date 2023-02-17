@@ -1,0 +1,223 @@
+<?xml version="1.0"?>
+<Submission>
+  <Description>
+    <Title>01-06-23-1-V2A - clinical - sars-cov-2</Title>
+    <Comment>SARS-CoV-2 test submission - 01-06-23-1-V2A GB</Comment>
+    <Organization type="center" role="owner">
+      <Name>University of Education Environmental Monitoring Laboratory</Name>
+      <Contact email="aresearch@uni.edu">
+        <Name>
+          <First>Agood</First>
+          <Last>Researcher</Last>
+        </Name>
+      </Contact>
+    </Organization>
+    <Hold release_date="2023-02-17"/>
+  </Description>
+  <Action>
+    <AddData target_db="BioSample">
+      <Data content_type="XML">
+        <XmlContent>
+          <BioSample schema_version="2.0">
+            <SampleId>
+              <SPUID spuid_namespace="CLT">CORVASEQ-CLT-013517_BioSample</SPUID>
+            </SampleId>
+            <Descriptor>
+              <Title>01-06-23-1-V2A BioSample</Title>
+            </Descriptor>
+            <Organism>
+              <OrganismName>Severe acute respiratory syndrome coronavirus 2</OrganismName>
+            </Organism>
+            <BioProject>
+              <PrimaryId db="BioProject">PRJNA553747</PrimaryId>
+            </BioProject>
+            <Package>SARS-CoV-2.cl.1.0</Package>
+            <Attributes>
+              <Attribute attribute_name="sample_name">CORVASEQ-CLT-013517</Attribute>
+              <Attribute attribute_name="sars_cov_2_diag_pcr_ct_value_1">21.7925</Attribute>
+              <Attribute attribute_name="collection_date">2022-12-16 00:00:00</Attribute>
+              <Attribute attribute_name="gisaid_virus_name">hCoV-19/USA/NC-CORVASEQ-CLT-013517/2022</Attribute>
+              <Attribute attribute_name="gisaid_accession">EPI_ISL_12346567</Attribute>
+              <Attribute attribute_name="isolate">SARS-CoV-2/human/USA/CORVASEQ-CLT-013517/2022</Attribute>
+              <Attribute attribute_name="organism">Severe acute respiratory syndrome coronavirus 2</Attribute>
+              <Attribute attribute_name="collected_by">University of Education Environmental Monitoring Laboratory</Attribute>
+              <Attribute attribute_name="geo_loc_name">USA: North Carolina</Attribute>
+              <Attribute attribute_name="host">Homo sapiens</Attribute>
+              <Attribute attribute_name="host_disease">COVID-19</Attribute>
+              <Attribute attribute_name="isolation_source">Clinical</Attribute>
+              <Attribute attribute_name="sars_cov_2_diag_gene_name_1">N (orf9)</Attribute>
+              <Attribute attribute_name="antiviral_treatment_agent">Restricted Access</Attribute>
+              <Attribute attribute_name="collection_device">Swab</Attribute>
+              <Attribute attribute_name="collection_method">Swabbing</Attribute>
+              <Attribute attribute_name="date_of_prior_antiviral_treat">Restricted Access</Attribute>
+              <Attribute attribute_name="date_of_prior_sars_cov_2_infection">Restricted Access</Attribute>
+              <Attribute attribute_name="date_of_sars_cov_2_vaccination">Restricted Access</Attribute>
+              <Attribute attribute_name="exposure_event">Restricted Access</Attribute>
+              <Attribute attribute_name="geo_loc_exposure">Restricted Access</Attribute>
+              <Attribute attribute_name="host_age">Restricted Access</Attribute>
+              <Attribute attribute_name="host_anatomical_material">Tissue</Attribute>
+              <Attribute attribute_name="host_anatomical_part">Nasopharynx</Attribute>
+              <Attribute attribute_name="host_body_product">Not Applicable</Attribute>
+              <Attribute attribute_name="host_disease_outcome">Restricted Access</Attribute>
+              <Attribute attribute_name="host_health_state">Restricted Access</Attribute>
+              <Attribute attribute_name="host_recent_travel_loc">Not Collected</Attribute>
+              <Attribute attribute_name="host_recent_travel_return_date">Not Collected</Attribute>
+              <Attribute attribute_name="host_sex">Missing</Attribute>
+              <Attribute attribute_name="host_specimen_voucher">Not Collected</Attribute>
+              <Attribute attribute_name="host_subject_id">Restricted Access</Attribute>
+              <Attribute attribute_name="lat_lon">Missing</Attribute>
+              <Attribute attribute_name="passage_method">Not Collected</Attribute>
+              <Attribute attribute_name="passage_number">Not Collected</Attribute>
+              <Attribute attribute_name="purpose_of_sampling">Diagnostic Testing</Attribute>
+              <Attribute attribute_name="purpose_of_sequencing">Targeted Surveillance</Attribute>
+              <Attribute attribute_name="sequenced_by">University of Education Environmental Monitoring Laboratory</Attribute>
+              <Attribute attribute_name="vaccine_received">Restricted Access</Attribute>
+              <Attribute attribute_name="virus_isolate_of_prior_infection">Restricted Access</Attribute>
+            </Attributes>
+          </BioSample>
+        </XmlContent>
+      </Data>
+      <Identifier>
+        <SPUID spuid_namespace="CLT">CORVASEQ-CLT-013517_BioSample</SPUID>
+      </Identifier>
+    </AddData>
+  </Action>
+  <Action>
+    <AddFiles target_db="SRA">
+      <File file_path="CORVASEQ-CLT-013517_barcode04.fastq">
+        <DataType>generic-data</DataType>
+      </File>
+      <Attribute name="sample_name">CORVASEQ-CLT-013517</Attribute>
+      <Attribute name="library_ID">CORVASEQ-CLT-013517</Attribute>
+      <Attribute name="amplicon_PCR_primer_scheme">https://github.com/nebiolabs/VarSkip/tree/main/schemes/NEB_VarSkip/V1a</Attribute>
+      <Attribute name="design_description">Viral sequencing was performed following a tiling amplicon strategy using the vss1a primer scheme. Sequencing was performed using a PromethIon by Oxford Nanopore Technologies . Libraries were prepared using NEBNext® ARTIC SARS-CoV-2 Companion Kit</Attribute>
+      <Attribute name="sequencing_protocol_name">Instruction manual:NEBNext® ARTIC SARS-CoV-2 Companion Kit: Chapter 3 along with Clean up after PCR amplification from Chapter 2</Attribute>
+      <Attribute name="title">Genomic sequencing of SARS-CoV-2: Clinical, USA:North Carolina</Attribute>
+      <Attribute name="library_strategy">AMPLICON</Attribute>
+      <Attribute name="library_source">VIRAL RNA</Attribute>
+      <Attribute name="library_selection">PCR</Attribute>
+      <Attribute name="library_layout">single</Attribute>
+      <Attribute name="platform">OXFORD_NANOPORE</Attribute>
+      <Attribute name="instrument_model">PromethION</Attribute>
+      <Attribute name="sequence_submitter_contact_email">aresearch@uni.edu</Attribute>
+      <Attribute name="dehosting_method">kraken2</Attribute>
+      <Attribute name="loader">fastq-load.py</Attribute>
+      <AttributeRefId name="BioProject">
+        <RefId>
+          <PrimaryId db="BioProject">PRJNA553747</PrimaryId>
+        </RefId>
+      </AttributeRefId>
+      <AttributeRefId name="BioSample">
+        <RefId>
+          <SPUID spuid_namespace="CLT">CORVASEQ-CLT-013517_BioSample</SPUID>
+        </RefId>
+      </AttributeRefId>
+      <Identifier>
+          <SPUID spuid_namespace="CLT">CORVASEQ-CLT-013517_SRA</SPUID>
+      </Identifier>
+    </AddFiles>
+  </Action>
+  <Action>
+    <AddData target_db="BioSample">
+      <Data content_type="XML">
+        <XmlContent>
+          <BioSample schema_version="2.0">
+            <SampleId>
+              <SPUID spuid_namespace="CLT">CORVASEQ-CLT-013522_BioSample</SPUID>
+            </SampleId>
+            <Descriptor>
+              <Title>01-06-23-1-V2A BioSample</Title>
+            </Descriptor>
+            <Organism>
+              <OrganismName>Severe acute respiratory syndrome coronavirus 2</OrganismName>
+            </Organism>
+            <BioProject>
+              <PrimaryId db="BioProject">PRJNA553747</PrimaryId>
+            </BioProject>
+            <Package>SARS-CoV-2.cl.1.0</Package>
+            <Attributes>
+              <Attribute attribute_name="sample_name">CORVASEQ-CLT-013522</Attribute>
+              <Attribute attribute_name="sars_cov_2_diag_pcr_ct_value_1">25.512339</Attribute>
+              <Attribute attribute_name="collection_date">2022-12-17 00:00:00</Attribute>
+              <Attribute attribute_name="gisaid_virus_name">hCoV-19/USA/NC-CORVASEQ-CLT-013522/2022</Attribute>
+              <Attribute attribute_name="gisaid_accession">EPI_ISL_12346568</Attribute>
+              <Attribute attribute_name="isolate">SARS-CoV-2/human/USA/CORVASEQ-CLT-013522/2022</Attribute>
+              <Attribute attribute_name="organism">Severe acute respiratory syndrome coronavirus 2</Attribute>
+              <Attribute attribute_name="collected_by">University of Education Environmental Monitoring Laboratory</Attribute>
+              <Attribute attribute_name="geo_loc_name">USA: North Carolina</Attribute>
+              <Attribute attribute_name="host">Homo sapiens</Attribute>
+              <Attribute attribute_name="host_disease">COVID-19</Attribute>
+              <Attribute attribute_name="isolation_source">Clinical</Attribute>
+              <Attribute attribute_name="sars_cov_2_diag_gene_name_1">N (orf9)</Attribute>
+              <Attribute attribute_name="antiviral_treatment_agent">Restricted Access</Attribute>
+              <Attribute attribute_name="collection_device">Swab</Attribute>
+              <Attribute attribute_name="collection_method">Swabbing</Attribute>
+              <Attribute attribute_name="date_of_prior_antiviral_treat">Restricted Access</Attribute>
+              <Attribute attribute_name="date_of_prior_sars_cov_2_infection">Restricted Access</Attribute>
+              <Attribute attribute_name="date_of_sars_cov_2_vaccination">Restricted Access</Attribute>
+              <Attribute attribute_name="exposure_event">Restricted Access</Attribute>
+              <Attribute attribute_name="geo_loc_exposure">Restricted Access</Attribute>
+              <Attribute attribute_name="host_age">Restricted Access</Attribute>
+              <Attribute attribute_name="host_anatomical_material">Tissue</Attribute>
+              <Attribute attribute_name="host_anatomical_part">Nasopharynx</Attribute>
+              <Attribute attribute_name="host_body_product">Not Applicable</Attribute>
+              <Attribute attribute_name="host_disease_outcome">Restricted Access</Attribute>
+              <Attribute attribute_name="host_health_state">Restricted Access</Attribute>
+              <Attribute attribute_name="host_recent_travel_loc">Not Collected</Attribute>
+              <Attribute attribute_name="host_recent_travel_return_date">Not Collected</Attribute>
+              <Attribute attribute_name="host_sex">Missing</Attribute>
+              <Attribute attribute_name="host_specimen_voucher">Not Collected</Attribute>
+              <Attribute attribute_name="host_subject_id">Restricted Access</Attribute>
+              <Attribute attribute_name="lat_lon">Missing</Attribute>
+              <Attribute attribute_name="passage_method">Not Collected</Attribute>
+              <Attribute attribute_name="passage_number">Not Collected</Attribute>
+              <Attribute attribute_name="purpose_of_sampling">Diagnostic Testing</Attribute>
+              <Attribute attribute_name="purpose_of_sequencing">Targeted Surveillance</Attribute>
+              <Attribute attribute_name="sequenced_by">University of Education Environmental Monitoring Laboratory</Attribute>
+              <Attribute attribute_name="vaccine_received">Restricted Access</Attribute>
+              <Attribute attribute_name="virus_isolate_of_prior_infection">Restricted Access</Attribute>
+            </Attributes>
+          </BioSample>
+        </XmlContent>
+      </Data>
+      <Identifier>
+        <SPUID spuid_namespace="CLT">CORVASEQ-CLT-013522_BioSample</SPUID>
+      </Identifier>
+    </AddData>
+  </Action>
+  <Action>
+    <AddFiles target_db="SRA">
+      <File file_path="CORVASEQ-CLT-013522_barcode09.fastq">
+        <DataType>generic-data</DataType>
+      </File>
+      <Attribute name="sample_name">CORVASEQ-CLT-013522</Attribute>
+      <Attribute name="library_ID">CORVASEQ-CLT-013522</Attribute>
+      <Attribute name="amplicon_PCR_primer_scheme">https://github.com/nebiolabs/VarSkip/tree/main/schemes/NEB_VarSkip/V2a</Attribute>
+      <Attribute name="design_description">Viral sequencing was performed following a tiling amplicon strategy using the vss2a primer scheme. Sequencing was performed using a PromethIon by Oxford Nanopore Technologies . Libraries were prepared using NEBNext® ARTIC SARS-CoV-2 Companion Kit</Attribute>
+      <Attribute name="sequencing_protocol_name">Instruction manual:NEBNext® ARTIC SARS-CoV-2 Companion Kit: Chapter 3 along with Clean up after PCR amplification from Chapter 2</Attribute>
+      <Attribute name="title">Genomic sequencing of SARS-CoV-2: Clinical, USA:North Carolina</Attribute>
+      <Attribute name="library_strategy">AMPLICON</Attribute>
+      <Attribute name="library_source">VIRAL RNA</Attribute>
+      <Attribute name="library_selection">PCR</Attribute>
+      <Attribute name="library_layout">single</Attribute>
+      <Attribute name="platform">OXFORD_NANOPORE</Attribute>
+      <Attribute name="instrument_model">PromethION</Attribute>
+      <Attribute name="sequence_submitter_contact_email">aresearch@uni.edu</Attribute>
+      <Attribute name="dehosting_method">kraken2</Attribute>
+      <Attribute name="loader">fastq-load.py</Attribute>
+      <AttributeRefId name="BioProject">
+        <RefId>
+          <PrimaryId db="BioProject">PRJNA553747</PrimaryId>
+        </RefId>
+      </AttributeRefId>
+      <AttributeRefId name="BioSample">
+        <RefId>
+          <SPUID spuid_namespace="CLT">CORVASEQ-CLT-013522_BioSample</SPUID>
+        </RefId>
+      </AttributeRefId>
+      <Identifier>
+          <SPUID spuid_namespace="CLT">CORVASEQ-CLT-013522_SRA</SPUID>
+      </Identifier>
+    </AddFiles>
+  </Action>
+</Submission>

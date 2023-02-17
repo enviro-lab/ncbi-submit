@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<Submission>
+  <Description>
+    <Title>01-06-23-1-V2A - clinical - sars-cov-2</Title>
+    <Comment>SARS-CoV-2 submission - 01-06-23-1-V2A GB</Comment>
+    <Organization type="center" role="owner">
+      <Name>University of Education Environmental Monitoring Laboratory</Name>
+      <Contact email="aresearch@uni.edu">
+        <Name>
+          <First>Agood</First>
+          <Last>Researcher</Last>
+        </Name>
+      </Contact>
+    </Organization>
+    <Hold release_date="2023-02-17"/>
+  </Description>
+  <Action>
+    <AddFiles target_db="GenBank">
+      <File file_path="genbank.zip">
+        <DataType>genbank-submission-package</DataType>
+      </File>
+      <Attribute name="wizard">BankIt_SARSCoV2_api</Attribute>
+      <Attribute name="auto_remove_failed_seqs">no</Attribute>
+      <Identifier>
+        <SPUID spuid_namespace="CLT">01-06-23-1-V2A.sarscov2</SPUID>
+      </Identifier>
+    </AddFiles>
+  </Action>
+</Submission>
