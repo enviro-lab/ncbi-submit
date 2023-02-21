@@ -5,6 +5,7 @@
 import pandas as pd
 from pathlib import Path
 import io
+from Bio import SeqIO
 
 main_dir = list(Path(__file__).resolve().parents)[1]
 

@@ -4,14 +4,14 @@
 # NCBI-Interact goes more in depth into NCBI programmatic submissions.
 
 # For testing purposes (both default to false if commented out) 
-test_dir = True # Prepare data with test accession and submit to NCBI's Test directory
+# test_dir = True # Prepare data with test accession and submit to NCBI's Test directory
 test_mode = True # Do everything except the actual upload of data
 
 # --- For automated NCBI uploads via FTP --
 # Some of the below values will be (not yet) used to populate the NCBI submission template file
 # create your own at: https://submit.ncbi.nlm.nih.gov/genbank/template/submission/
 # `host` defaults to "ftp-private.ncbi.nlm.nih.gov", but can be adjusted if submitting elsewhere
-template = "template.sbt"
+template = "./template.sbt"
 host = ""
 ncbiUser = ""
 ncbiPass = ""

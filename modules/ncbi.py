@@ -6,11 +6,12 @@ import datetime
 from io import StringIO
 import os
 import textwrap
-from zipfile import ZipFile
 import pandas as pd
 from modules.helpers import *
 from modules.report import Report
 from modules.xml_format import SRA_BioSample_Submission,GenBank_Submission
+from zipfile import ZipFile
+from Bio import SeqIO
 
 ### TRY to use these as parameters from ncbi_interact (avoid them as attributes)
 # self.sra_only = sra_only
@@ -30,7 +31,7 @@ class NCBI:
     def __init__(self,plate,fastq_dir,seq_report,outdir,barcode_map=None,
                  config=None,controls=None,gisaid_log=None,primer_map=None,
                  primer_scheme=None,fasta=None,ncbiUser=None,ncbiPass=None,
-                 host=None,test_dir=False,test_mode=False) -> None:
+                 host=None,test_dir=False,test_mode=False,use_existing=False) -> None:
         """Creates an object that can prepare, submit, and track csv/xml submission files 
 
         Args:
@@ -40,8 +41,8 @@ class NCBI:
         cf,self.config_file = getConfig(config)
         self.template = cf["template"]
         self.host = host or cf["host"] or "ftp-private.ncbi.nlm.nih.gov"
-        self.ncbiUser = cf["ncbiUser"]
-        self.ncbiPass = cf["ncbiPass"]
+        self.ncbiUser = ncbiUser or cf.get("ncbiUser")
+        self.ncbiPass = ncbiPass or cf.get("ncbiPass")
         self._check_login()
         self.centerAbbr = cf["centerAbbr"]
         self.contact = cf["contact"]
@@ -63,12 +64,13 @@ class NCBI:
         self.ftp = None
         self.test_dir = test_dir if test_dir==True else cf.get("test_dir",test_dir)
         self.test_mode = test_mode if test_mode==True else cf.get("test_mode",test_mode)
+        self.use_existing = use_existing
 
         # set plate-specific details
-        self.fastq_dir = Path(fastq_dir)
-        self.seq_report = Path(seq_report)
+        self.fastq_dir = Path(fastq_dir) if fastq_dir else None
+        self.seq_report = Path(seq_report) if seq_report else None
         self.plate = plate
-        self.outdir = Path(outdir)
+        self.outdir = self._set_outdir(outdir)
         self.exclude_file = self.outdir / "samples2exclude.txt"
         self.barcode_map = None if barcode_map==None else Path(barcode_map) # only required for file prep
         self.report_dir = self.outdir / "bs_sra_reports"
@@ -111,6 +113,15 @@ class NCBI:
 
     ### --- vvv --- miscellaneous --- vvv --- ###
 
+    def _set_outdir(self,outdir):
+        """Insures "test" is in `outdir` basename, if using `test_dir` flag"""
+
+        outdir = Path(outdir)
+        if self.test_dir and "test" not in outdir.name:
+            print("Resetting outdir --> test")
+            return outdir.parent / f"{outdir.name}_test"
+        return outdir
+
     def _check_login(self,missing_ok=True):
         """Checks for login info in config or env variables
 
@@ -146,7 +157,9 @@ class NCBI:
         """Creates df from `seq_report`"""
 
         # local sequencing report data
-        if self.seq_report == None: raise Exception("`seq_report` must be provided")
+        if self.seq_report == None:
+            return
+            # raise Exception("`seq_report` must be provided")
         spreadsheet = pd.read_csv(self.seq_report).rename(columns={"primer_scheme":"Primer Scheme","primer scheme":"Primer Scheme",})
         # if using biosample with headers beginning with underscores
         if hasUnderscoredHeaders(spreadsheet.columns):
@@ -185,11 +198,13 @@ class NCBI:
         if self.gisaid_log == None:
             return pd.DataFrame()
         else:
-            gisaid = pd.read_csv(self.gisaid_log, sep=';', header=None, names=["gisaid_virus_name", "gisaid_accession"])
+            gisaid = pd.read_csv(self.gisaid_log, sep=';', header=None, names=["gisaid_virus_name", "gisaid_accession"],nrows=2).dropna()
             for col in gisaid.columns: # remove extra spaces in values
                 gisaid[col] = gisaid[col].apply(lambda x: str(x).strip())
-                gisaid["sample_name"] = gisaid["gisaid_virus_name"].apply(lambda x: x.split("/")[2].replace(f"{self.affiliation['sub']}-",""))
-            return gisaid[~gisaid["gisaid_virus_name"].str.contains("submissions")]
+                gisaid["sample_name"] = gisaid["gisaid_virus_name"].apply(self.virus_to_sample_name)
+                gisaid = gisaid[~gisaid["sample_name"].isin(self._findExcludables())]
+                # gisaid = gisaid[~gisaid["gisaid_virus_name"].str.contains("submissions")] # TODO: check this isn't needed
+            return gisaid
 
     def _ensure_new_names_only(self,df):
         """Raises Exception if any 'sample_name' in `df` was already-submitted"""
@@ -397,7 +412,7 @@ class NCBI:
             elif as_dict:
                 return accessions
 
-    def add_biosamples_2_genbank(self,biosample_accessions=None):
+    def add_biosample_2_genbank(self,biosample_accessions=None):
         """Adds BioSample accessions to GenBank TSV"""
 
         # read in dfs
@@ -436,14 +451,14 @@ class NCBI:
         """
 
         if add_biosample:
-            self.add_biosamples_2_genbank(biosample_accessions)
+            self.add_biosample_2_genbank(biosample_accessions)
             return
         
         cols = ['sample_name','organism','geo_loc_name', 'host', 'isolate', 'collection_date', 'isolation_source', 'bioproject_accession', 'gisaid_accession']
         if ignore_dates: cols = remove_item('collection_date',cols)
         genbank_df: pd.DataFrame = self.biosample["df"].copy()[cols]
         genbank_df['biosample_accession'] = 'Missing'
-        genbank_df['gisaid_accession'] = genbank_df['gisaid_accession'].apply(lambda x: 'GISIAD accession: ' + str(x).strip() if str(x)!='missing' else "")
+        genbank_df['gisaid_accession'] = genbank_df['gisaid_accession'].apply(lambda x: 'GISAID accession: ' + str(x).strip() if str(x)!='missing' else "")
         submittable = self.get_gisaid_submitted_samples()
         # filter to gisaid-only
         if not submittable=="all":
@@ -458,11 +473,19 @@ class NCBI:
         self.genbank["final_cols"] = list(genbank_df.columns)
         return genbank_df
     
-    def _offer_skip_option(self,sample_name):
-        return textwrap.dedent(f"""If submission of this sample should be skipped, write it in a line by itself in a file called:
-            {self.exclude_file}\n"
-            You can use this command:\n"
-            echo "{sample_name}" >> {self.exclude_file}'""")
+    def _offer_skip_option(self,samples):
+        """Guides user on how to mark desired samples to be excluded from submission.
+
+        Args:
+            samples (Collection): Samples that are missing from one input spreadsheet or another
+        """
+
+        output = ["Any samples that should not be submitted can be written on a line by themselves in a file called",
+            f"{self.exclude_file}",
+            "You can use this command:"]
+        for sample_name in samples:
+            output += [f'echo "{sample_name}" >> {self.exclude_file}']
+        return "\n".join(output)
 
     def _get_fastq_file(self,sample_name):
         """Verifies and returns single fastq file basename for SRA
@@ -478,13 +501,13 @@ class NCBI:
         if len(possible_files) == 1:
             file_path:Path = possible_files[0]
         elif len(possible_files) > 1:
-            FileNotFoundError(f"Too many potential fastq files for sample '{sample_name}' in {self.fastq_dir}")
+            raise FileNotFoundError(f"Too many potential fastq files for sample '{sample_name}' in {self.fastq_dir}")
         else:
-            FileNotFoundError(f"Can't find expected fastq file for {sample_name} in {self.fastq_dir}\n{self._offer_skip_option(sample_name)}")
+            raise FileNotFoundError(f"Can't find expected fastq file for {sample_name} in {self.fastq_dir}\n{self._offer_skip_option([sample_name])}")
         if file_path.exists():
             return file_path.name
         else:
-            raise FileNotFoundError(f"expected fastq file {file_path} does not exist.\n{self._offer_skip_option(sample_name)}")
+            raise FileNotFoundError(f"expected fastq file {file_path} does not exist.\n{self._offer_skip_option([sample_name])}")
             # return None
 
     def _get_paired_fastq_files(self,sample_name):
@@ -682,82 +705,112 @@ class NCBI:
     ###############  ^^^^  xml_prep  ^^^^  ###############
     ###############  vvvv  zip_prep  vvvv  ###############
 
-    def generate_updated_fasta_records(fasta):
-        "returns generator of fasta records with only first part of header (drops /medaka something-or-other)"
-        for record in SeqIO.parse(fasta,"fasta"):
-            # update id
+    def verifyUnsubmittable(self,samples_to_maybe_exclude,warning=""):
+        """Prints warning and recommends marking samples for exclusion if needed"""
+
+        if len(samples_to_maybe_exclude) != 0:
+            print(f"WARNING: {warning}")
+            self._offer_skip_option(samples_to_maybe_exclude)
+            exit(1)
+
+    def getAllowedSamples(self,all_samples=None):
+        """Returns collection of allowed samples from gisaid logfile or else all_samples
+        
+        Args:
+            all_samples (Collection): default samples if no gisaid-submitted-samples exist to limit by
+        """
+
+        allowed_samples = self.get_gisaid_submitted_samples()
+        if allowed_samples == "all":
+            print(f"WARNING: no `gisaid_log` provided, so assuming all samples from `seq_report` should be submitted excluding any found in {self.exclude_file}")
+            # NOTE: filtering out samples from `self.exclude_file` has already been done in TSV prep
+            return all_samples
+        gisaid_extras = set(allowed_samples) - set(all_samples)
+        gisaid_missing = set(all_samples) - set(allowed_samples)
+        self.verifyUnsubmittable(gisaid_extras,"Sample(s) found in `gisaid_log` that lack metadata.")
+        self.verifyUnsubmittable(gisaid_missing,"Metadata exists for sample(s) that can't be found in `gisaid_log`.")
+        return set(allowed_samples)
+    
+    def generate_updated_fasta_records(self):
+        """Yields fasta records with only first part of header (drops "/medaka*")"""
+
+        p = Path(self.fasta)
+        if not p.exists():
+            raise FileNotFoundError(f"`fasta` file not found: {self.fasta}")
+        for record in SeqIO.parse(self.fasta,"fasta"):
+            # update id # TODO: ensure this is universal
             record.id = record.id.split("/")[0]
             yield record
 
-    def get_sample_name(virus_name):
-        "converts GISAID Virus name to our typical sample identifier"
-        return virus_name.split("/")[2].replace("NC-","") # assumes state is NC # TODO: generalize
+    def write_genbank_fasta(self,outHandle):
+        """Writes GenBank fasta seqs to provided outHandle"""
 
-    def getAllowedSamples(data,gisaid_log):
-        "uses only samples in gisaid_log (if provided) or else previously made genbank TSV as allowed samples from provided fasta"
-        # acquire collection of allowed samples from gisaid logfile, if provided
-        # gisaid_log = getattr(args,"gisaid_log",None)
-        if gisaid_log != None:
-            # allowed_samples = set(pd.read_csv(gisaid_log,header=None,names=["gisaid_virus_name","Accession ID"],sep=";").dropna()["gisaid_virus_name"].apply(get_sample_name))
-            allowed_samples = set(getGisaidDF(gisaid_log)["gisaid_virus_name"].apply(get_sample_name))
-        else:
-            # assume original TSV from file_prep step is filtered to gisaid-submitted (or otherwise desired) samples
-            allowed_samples = set(data["GenBank"].df["Sequence_ID"].unique())
-        return allowed_samples
-
-    def write_genbank_fasta(outHandle,data,fasta):
-        "writes GenBank fasta to provided outHandle"
-        allowed_samples = getAllowedSamples(data,gisaid_log)
-        # print(allowed_samples)
-        for record in generate_updated_fasta_records(fasta):
+        allowed_samples = self.getAllowedSamples(self.biosample["df"]["sample_name"].unique())
+        added_samples = set()
+        # write fasta
+        for record in self.generate_updated_fasta_records():
             if record.id in allowed_samples:
+                added_samples.add(record.id)
                 outHandle.write(f">{record.id}\n")
                 # trim leading/trailing Ns
                 record.seq = record.seq.strip("N")
                 outHandle.write(f"{record.seq}\n")
+        # ensure all expecte samples were found and added to genbank fasta
+        if len(allowed_samples) > len(added_samples):
+            self.verifyUnsubmittable(allowed_samples-added_samples,f"Not all samples found in `fasta` file: {self.fasta}.")
 
-    def ensureCorrectBioProject(tsv_str,test_dir):
-        "if this is a test submission, replace all BioProject accessions with one that exists in the test submission database"
-        if not test_dir: return tsv_str
-        row_list = []
-        for row in tsv_str.split("\n"):
-            listed_row = []    
-            for col in row.split("\t"):
-                if "PRJNA" in col:
-                    col = "PRJNA553747"
-                listed_row.append(col)
-            row_list.append("\t".join(listed_row))
-        return "\n".join(row_list)
+    # def ensureCorrectBioProject(tsv_str,test_dir):
+    #     "if this is a test submission, replace all BioProject accessions with one that exists in the test submission database"
+    #     # TODO: is this already covered?
+    #     if not test_dir: return tsv_str
+    #     row_list = []
+    #     for row in tsv_str.split("\n"):
+    #         listed_row = []    
+    #         for col in row.split("\t"):
+    #             if "PRJNA" in col:
+    #                 col = "PRJNA553747"
+    #             listed_row.append(col)
+    #         row_list.append("\t".join(listed_row))
+    #     return "\n".join(row_list)
 
-    def write_genbank_zip(self,data,outdir:Path,test_dir,template,plate):
-        "writes zipfile for GenBank submission"
+    def write_genbank_zip(self):
+        """Writes zipfile for GenBank submission"""
+
         # documentation and sample files are here: https://www.ncbi.nlm.nih.gov/viewvc/v1/trunk/submit/public-docs/genbank/SARS-CoV-2/
-        with ZipFile(outdir.joinpath("genbank.zip"), "w") as zfh:
-            # writing from stringio avoids any py2/3 unicode trouble (-Multisub)
+        with ZipFile(self.outdir.joinpath("genbank.zip"), "w") as zfh:
+            # writing from stringio avoids any py2/3 unicode trouble (--credit: Multisub)
             print("\twriting fasta")
             with StringIO() as memFh:
-                self.write_genbank_fasta(memFh,data,fasta)
+                self.write_genbank_fasta(memFh)
                 zfh.writestr("seqs.fsa", memFh.getvalue())
 
             print("\twriting tsv --> src")
-            with outdir.joinpath("genbank-metadata.tsv").open() as tsv:
-                tsv_string = self.ensureCorrectBioProject(tsv.read(),test_dir)
+            with self.outdir.joinpath("genbank-metadata.tsv").open() as tsv:
+                # tsv_string = self.ensureCorrectBioProject(tsv.read(),self.test_dir)
+                # biosample_df = biosample_df[~biosample_df['sample_name'].isin(self._findExcludables())] # use something like this?
+                # tsv_string = self.exclude_necessary_samples(tsv.read()) #TODO
+                tsv_string = tsv.read()
                 zfh.writestr("seqs.src", tsv_string)
             # with StringIO() as memFh:
             #     writeMetaTsv(sourceTags, memFh)
             #     zfh.writestr("seqs.src", memFh.getvalue())
 
             print("\twriting template")
-            # template = getattr(args,"template",None) # priority goes to template path from args
-            if template==None:
-                template = cf.get("template",None) # seek template path from `config_file`
+            template = getattr(self,"template",None) # seek template path from `config_file`
             if not template:
                 # TODO: generate template from `config_file`
-                raise Exception("Path to `template` file must be provided in `config_file` or args.")
-            with Path(template).open() as sbt, StringIO() as memFh:
+                raise Exception("Path to `template` file must be provided in `config_file`.")
+            tentaive_template = Path(template).resolve()
+            if tentaive_template.exists():
+                template = tentaive_template
+            else:
+                if self.config_file.parent.joinpath(template).exists():
+                    template = self.config_file.parent.joinpath(template)
+                else: raise FileNotFoundError("Can't find template: {template}")
+            with template.open() as sbt, StringIO() as memFh:
                 for line in sbt:
                     if "Submission Title:None" in line:
-                        line = line.replace(":None",f":{plate} GenBank")
+                        line = line.replace(":None",f":{self.plate} GenBank")
                     memFh.write(line)
                 zfh.writestr("seqs.sbt",memFh.getvalue())
                 # zfh.writestr("seqs.sbt",sbt.read())
@@ -783,9 +836,9 @@ class NCBI:
         This should be the go-to method for preparing and writing out files for initial submission to BioSample and/or SRA
 
         Args:
-            action (str: "file_prep" | "add_biosamples"): 
+            action (str: "file_prep" | "add_biosample"): 
                 "file_prep": Creates initial TSV and XML files
-                "add_biosamples": adds biosample accessions from previous submission to genbank tsv
+                "add_biosample": adds biosample accessions from previous submission to genbank tsv
             keep_tsvs (bool, optional): If False, TSVs will be deleted. Defaults to True.
             keep_xmls (bool, optional): If False, XMLs will be deleted. Defaults to True.
         """
@@ -806,9 +859,8 @@ class NCBI:
             )
 
         # prepare/write XML
-        print("writing sra/biosample xml")
+        print(f"writing sra/biosample xml:\n   {self.outdir/'sra_biosample.xml'}")
         self.write_sra_biosample_xml()
-        self.write_genbank_xml()
 
         # # remove unwanted text files
         # if not keep_tsvs:
@@ -821,7 +873,19 @@ class NCBI:
         #         xml:Path = dataset["xml_file"]
         #         xml.unlink()
 
+    def write_genbank_submission_zip(self):
+        """Prepares Zip file for GenBank submission.
+        
+        Contents:
+          * genbank.xml
+          * genbank.zip (seqs.sbt, seqs.fsa, seqs.src)
+        """
+        # TODO - there's one more file to add here, I think ^^
 
+        print(f"writing genbank xml:\n   {self.outdir/'genbank.xml'}")
+        self.write_genbank_xml()
+        print(f"writing genbank zip:\n   {self.outdir/'genbank.zip'}")
+        self.write_genbank_zip()
 
 
     ### --- ^^^ --- file prep --- ^^^ --- ###

@@ -17,4 +17,15 @@ python "${main_dir}/ncbi_interact.py" \
     --outdir "${plate_dir}/ncbi/" \
     --primer_map "${plate_dir}/primer_map-01-06-23-1-V2A.csv" \
     --gisaid_log "${plate_dir}/gisaid_uploader.log" \
+    --username asdf --password qwerty
+
+python "${main_dir}/ncbi_interact.py" \
+    file_prep --prep_genbank \
+    --fasta "${plate_dir}/seqs-01-06-23-1-V2A.fasta" \
+    --fastq_dir "${plate_dir}/fastqs/" \
+    --seq_report "${plate_dir}/Sequencing_report-01-06-23-1-V2A-All.csv" \
+    --plate "${plate}" \
+    --outdir "${plate_dir}/ncbi/" \
+    --primer_map "${plate_dir}/primer_map-01-06-23-1-V2A.csv" \
+    --gisaid_log "${plate_dir}/gisaid_uploader.log" 
     # --primer_scheme 'vss2a'

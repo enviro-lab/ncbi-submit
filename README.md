@@ -1,6 +1,7 @@
 # ncbi_interact
 Submitting data to public databases is super important for publically funded laboratories, but it is not always a quick or intuitive process. NCBI Interact provides a simple and repeatable way to upload programmatic submissions to NCBI's SRA and GenBank with shared or unique BioProjects and BioSamples. Data can be uploaded as XML or zip files to either the Test or Production environments, and once there, the reports produced by NCBI can be analyzed to check on submission status and get BioSample accessions.
 
+***
 ## Usage
 
 `ncbi_interact.py` is intended for use on the command line, but the class `ncbi.NCBI` can be imported and used within custom python scripts.
@@ -8,17 +9,17 @@ Submitting data to public databases is super important for publically funded lab
 There are three main actions the script can do:
 * `file_prep`: 
   * Prepares .tsv & .xml files for SRA, BioSample, & BioProject submissions
-  * Used to prepare all files for an initial submission to NCBI
-* `add_biosamples`:
-  * Prepares .zip, .sbt, & .tsv files for GenBank Submission
-  * Used to add BioSample accessions from a BioSample submission for a GenBank submission
-* `ftp`:
+  * Used to prepare all files for initial submission to NCBI
+  * To add in biosample accessions and prepare for GenBank submission, include the flag `prep_genbank`:
+    * Prepares .zip, .sbt, & .tsv files for GenBank Submission
+    * Used to add BioSample accessions from a BioSample submission for a GenBank submission
+* `ftp` submission or checkup:
   * Interacts with NCBI's ftp host to do either of the following:
     * `submit` data to NCBI databases 
     * `check` on previous ftp submissions
 
 ### Setup
-The required parameters vary by which of the above actions you're attempting but at minimum require a `plate` and `outdir`. To limit the number of parameters required via command line, a `config` file must be used When running from the command line, one of the three actions (`file_prep`, `ftp`, or `add_biosample`) must be specified. With python, these are associated methods you may use on a single NCBI object.
+The required parameters vary by which of the above actions you're attempting but at minimum require a `plate` and `outdir`. To limit the number of parameters required via command line, a `config` file must be used When running from the command line, one of the three actions (`file_prep` or `ftp`) must be specified. With python, these are associated methods you may use on a single NCBI object.
 
 #### Python instantiation (not needed on command line):
 Note: This is the minimum required info for preparing data. Other parameters may be necessary for more functionality or other tasks.  
@@ -92,7 +93,7 @@ python ncbi_interact.py ftp \
     --fastq_dir "${FASTQS}"
 
 # add accessions to genbank.tsv
-python ncbi_interact.py add_biosamples \
+python ncbi_interact.py add_biosample \
     --outdir "${NCBI_DIR}" \
     --config ${NCBI_CONFIG} \
     --fasta "${GENERIC_CONSENSUS//PLATE/$PLATE}" \
@@ -114,6 +115,19 @@ python ncbi_interact.py ftp \
 ncbi.() # TODO: finish this
 ```
 
+***
+## Input Paths
+### Required Files:
+  * `config`: Contains preset values and details about your lab, team, and submission plans that are necessary for submission.
+  * `seq_report`: Main metadata file with sample details - can be equivalent to NCBI's BioSample TSV for use with the Submission Portal.
+### Optional Files
+  * `exclude_file`: Contains a list of "sample_name"s to exclude from NCBI submission (each one on a new line).
+  * `barcode_map`: Used as a cross-reference. If all samples from `barcode_map` appear in `seq_report`, that's great. Otherwise, you'll get a warning with directions for adding samples to the `exclude_file` if they shouldn't be submitted.
+### Sometimes Required Paths
+  * `fastq_dir`: Required for `file_prep` and `ftp` if submitting reads to SRA. Indicates where the fastqs should be gathered from. Any fastqs with "sample_name" values that aren't supposed to be submitted will be ignored.
+  * `subdir`: Highly recommended but will defualt to "./ncbi" or "./ncbi_test". A directory to house output (submission reports, `exclude_file`, output from `file_prep`). Will be created, if needed.
+
+***
 ## Links to xml template examples/schema:
 | File type | BioProject | BioSample | SRA | GenBank | Description/Link
 |  --- | --- | --- | --- | --- | --- |
