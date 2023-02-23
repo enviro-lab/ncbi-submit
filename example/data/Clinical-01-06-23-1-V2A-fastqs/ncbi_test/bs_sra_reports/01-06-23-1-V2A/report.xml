@@ -1,0 +1,40 @@
+<?xml version='1.0' encoding='utf-8'?>
+<SubmissionStatus status="processing" submission_id="SUB815302" last_update="2023-02-23T13:11:03.819535">
+  <Action status="processed-ok" action_id="SUB815302-corvaseq-clt-013517_biosample" target_db="BioSample" notify_submitter="true">
+    <Response status="processed-ok">
+      <Message severity="info">Successfully loaded</Message>
+      <Object target_db="BioSample" object_id="2331553" status="new" last_update="2023-02-23T13:11:03.110" accession="SAMN02331553" spuid="CORVASEQ-CLT-013517_BioSample" spuid_namespace="CLT">
+        <Meta>
+          <Organism taxid="2697049">Severe acute respiratory syndrome coronavirus 2</Organism>
+          <Isolate>SARS-CoV-2/human/USA/CORVASEQ-CLT-013517/2022</Isolate>
+          <BioProjectID>553747</BioProjectID>
+          <BioProject>PRJNA553747</BioProject>
+          <Status>live</Status>
+        </Meta>
+      </Object>
+    </Response>
+  </Action>
+  <Action action_id="SUB815302-corvaseq-clt-013517_sra" target_db="SRA" status="processing" notify_submitter="false">
+    <Response status="processing"/>
+  </Action>
+  <Action status="processed-ok" action_id="SUB815302-corvaseq-clt-013522_biosample" target_db="BioSample" notify_submitter="true">
+    <Response status="processed-ok">
+      <Message severity="info">Successfully loaded</Message>
+      <Object target_db="BioSample" object_id="2331552" status="new" last_update="2023-02-23T13:11:02.753" accession="SAMN02331552" spuid="CORVASEQ-CLT-013522_BioSample" spuid_namespace="CLT">
+        <Meta>
+          <Organism taxid="2697049">Severe acute respiratory syndrome coronavirus 2</Organism>
+          <Isolate>SARS-CoV-2/human/USA/CORVASEQ-CLT-013522/2022</Isolate>
+          <BioProjectID>553747</BioProjectID>
+          <BioProject>PRJNA553747</BioProject>
+          <Status>live</Status>
+        </Meta>
+      </Object>
+    </Response>
+  </Action>
+  <Action action_id="SUB815302-corvaseq-clt-013522_sra" target_db="SRA" status="processing" notify_submitter="false">
+    <Response status="processing"/>
+  </Action>
+  <Tracking>
+    <SubmissionLocation>/am/ftp-trace/centers/CLT/submit/Test/01-06-23-1-V2A</SubmissionLocation>
+  </Tracking>
+</SubmissionStatus>

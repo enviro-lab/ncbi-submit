@@ -1,0 +1,36 @@
+<?xml version='1.0' encoding='utf-8'?>
+<SubmissionStatus status="processed-error" submission_id="SUB815302" last_update="2023-02-23T10:01:03.036979">
+  <Action status="processed-error" action_id="SUB815302-corvaseq-clt-013517_biosample" target_db="BioSample" notify_submitter="true">
+    <Response status="processed-error">
+      <Message error_code="20" severity="error-stop" error_source="data">These attribute values are not valid so please correct the data. Refer to https://www.ncbi.nlm.nih.gov/biosample/docs/attributes/ for required format descriptions. If you do not have information for the required field(s), please provide the value as either 'missing', 'not applicable', 'not collected', 'not provided' or 'restricted access'.</Message>
+      <Object target_db="BioSample" object_id="" spuid="CORVASEQ-CLT-013517_BioSample" spuid_namespace="CLT">
+        <Details>
+          <Attributes>
+            <Attribute attribute_name="collection_date" display_name="collection date" harmonized_name="collection_date" status="invalid">2022-12-16 00:00:00</Attribute>
+          </Attributes>
+        </Details>
+      </Object>
+    </Response>
+  </Action>
+  <Action action_id="SUB815302-corvaseq-clt-013517_sra" target_db="SRA" status="processing" notify_submitter="false">
+    <Response status="processing"/>
+  </Action>
+  <Action status="processed-error" action_id="SUB815302-corvaseq-clt-013522_biosample" target_db="BioSample" notify_submitter="true">
+    <Response status="processed-error">
+      <Message error_code="20" severity="error-stop" error_source="data">These attribute values are not valid so please correct the data. Refer to https://www.ncbi.nlm.nih.gov/biosample/docs/attributes/ for required format descriptions. If you do not have information for the required field(s), please provide the value as either 'missing', 'not applicable', 'not collected', 'not provided' or 'restricted access'.</Message>
+      <Object target_db="BioSample" object_id="" spuid="CORVASEQ-CLT-013522_BioSample" spuid_namespace="CLT">
+        <Details>
+          <Attributes>
+            <Attribute attribute_name="collection_date" display_name="collection date" harmonized_name="collection_date" status="invalid">2022-12-17 00:00:00</Attribute>
+          </Attributes>
+        </Details>
+      </Object>
+    </Response>
+  </Action>
+  <Action action_id="SUB815302-corvaseq-clt-013522_sra" target_db="SRA" status="processing" notify_submitter="false">
+    <Response status="processing"/>
+  </Action>
+  <Tracking>
+    <SubmissionLocation>/am/ftp-trace/centers/CLT/submit/Test/01-06-23-1-V2A</SubmissionLocation>
+  </Tracking>
+</SubmissionStatus>

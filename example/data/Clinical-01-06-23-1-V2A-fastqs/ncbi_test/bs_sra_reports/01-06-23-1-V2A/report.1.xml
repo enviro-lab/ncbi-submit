@@ -1,0 +1,4 @@
+<?xml version='1.0' encoding='utf-8'?>
+<SubmissionStatus status="failed">
+  <Message severity="error-stop">The required file 'submission.xml' is missing in /am/ftp-trace/centers/CLT/submit/Test/01-06-23-1-V2A</Message>
+</SubmissionStatus>
