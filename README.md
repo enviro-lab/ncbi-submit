@@ -68,16 +68,19 @@ python ncbi_interact.py ftp \
 ```
 #### Python:
 ```python
-ncbi.() # TODO: finish this
+ncbi.submit(db="bs_sra)
+# wait awhile and try this to download reports and view submission status
+ncbi.check(db="bs_sra)
 ```
 
 ### GenBank submission
 (NOTE: not fully tested)
 To link your fasta in GenBank to the associated reads, you'll want to add in the BioSample accessions before submitting. Follow these steps.
-* Acquire BioSample accessions via one of these:
+* Acquire BioSample accessions via one of these methods:
   * download accessions.tsv file from NCBI
-    * (Required if you submitted to BioSample via NCBI's Submission Portal)
+    * (Do this if you submitted to BioSample via NCBI's Submission Portal)
   * use ncbi_interact.py
+    * (Do this to avoid manual uploads  via NCBI's Submission Portal)
 #### Shell:
 ```console
 # dowload report.xml files to get accesssions from
@@ -91,7 +94,7 @@ python ncbi_interact.py ftp \
     --fastq_dir "${FASTQS}"
 
 # add accessions to genbank.tsv
-python ncbi_interact.py add_biosample \
+python ncbi_interact.py --prep_genbank \
     --outdir "${NCBI_DIR}" \
     --config ${NCBI_CONFIG} \
     --fasta "${GENERIC_CONSENSUS//PLATE/$PLATE}" \
@@ -109,8 +112,35 @@ python ncbi_interact.py ftp \
 ```
 #### Python:
 ```python
-ncbi.() # TODO: finish this
+# dowload report.xml files to get accesssions from
+ncbi.check(db="bs_sra)
+# prepare genbank submission files and submit
+ncbi.submit(db="gb")
+# files can also be prepared without submitting via:
+ncbi.write_genbank_submission_zip()
 ```
+
+***
+### Check Submission Status
+Wait awhile (10+ minutes) for NCBI to start processing the submission. Then run this to download reports and view submission status.
+This works for whichever db you want to check on. If not specified, you'll get results on all submitted dbs.
+
+#### Shell:
+```console
+# submit to GenBank (NOTE: db='gb')
+python ncbi_interact.py ftp \
+    --check --db gb \
+    --test_mode --test_dir \
+    --config "${NCBI_CONFIG}" \
+    --outdir "${NCBI_DIR}" \
+    -u "${ncbi_username}" \
+    -p "${ncbi_password}"
+```
+#### Python:
+```python
+ncbi.check(db="bs_sra)
+```
+
 
 ***
 ## Input Paths
