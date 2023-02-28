@@ -146,3 +146,9 @@ def get_bioproject_spuid(ncbi):
 
     ncbi:NCBI
     return f'<SPUID spuid_namespace="{ncbi.centerAbbr}">{ncbi.bioproject_presets["spuid"]}</SPUID>'
+
+def asDate(some_date):
+    """Converts ftp.mlsd() `modify` time to easy-to-read date/time"""
+    
+    y,mo,d,h,m,s = some_date[:4],some_date[4:6],some_date[6:8],some_date[8:10],some_date[10:12],some_date[12:14]
+    return f"{y}-{mo}-{d} {h}:{m}:{s}"

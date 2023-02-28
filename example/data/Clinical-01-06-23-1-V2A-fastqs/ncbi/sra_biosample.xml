@@ -2,7 +2,7 @@
 <Submission>
   <Description>
     <Title>01-06-23-1-V2A - clinical - sars-cov-2</Title>
-    <Comment>SARS-CoV-2 submission - 01-06-23-1-V2A GB</Comment>
+    <Comment>SARS-CoV-2 test submission - 01-06-23-1-V2A GB</Comment>
     <Organization type="center" role="owner">
       <Name>University of Education Environmental Monitoring Laboratory</Name>
       <Contact email="aresearch@uni.edu">
@@ -12,7 +12,7 @@
         </Name>
       </Contact>
     </Organization>
-    <Hold release_date="2023-02-21"/>
+    <Hold release_date="2023-02-23"/>
   </Description>
   <Action>
     <AddData target_db="BioSample">
@@ -29,13 +29,13 @@
               <OrganismName>Severe acute respiratory syndrome coronavirus 2</OrganismName>
             </Organism>
             <BioProject>
-              <PrimaryId db="BioProject">PRJNA111111</PrimaryId>
+              <PrimaryId db="BioProject">PRJNA553747</PrimaryId>
             </BioProject>
             <Package>SARS-CoV-2.cl.1.0</Package>
             <Attributes>
               <Attribute attribute_name="sample_name">CORVASEQ-CLT-013517</Attribute>
               <Attribute attribute_name="sars_cov_2_diag_pcr_ct_value_1">21.7925</Attribute>
-              <Attribute attribute_name="collection_date">2022-12-16 00:00:00</Attribute>
+              <Attribute attribute_name="collection_date">2022-12-16</Attribute>
               <Attribute attribute_name="gisaid_virus_name">hCoV-19/USA/NC-CORVASEQ-CLT-013517/2022</Attribute>
               <Attribute attribute_name="gisaid_accession">EPI_ISL_12346567</Attribute>
               <Attribute attribute_name="isolate">SARS-CoV-2/human/USA/CORVASEQ-CLT-013517/2022</Attribute>
@@ -104,7 +104,7 @@
       <Attribute name="loader">fastq-load.py</Attribute>
       <AttributeRefId name="BioProject">
         <RefId>
-          <PrimaryId db="BioProject">PRJNA111111</PrimaryId>
+          <PrimaryId db="BioProject">PRJNA553747</PrimaryId>
         </RefId>
       </AttributeRefId>
       <AttributeRefId name="BioSample">
@@ -132,13 +132,13 @@
               <OrganismName>Severe acute respiratory syndrome coronavirus 2</OrganismName>
             </Organism>
             <BioProject>
-              <PrimaryId db="BioProject">PRJNA111111</PrimaryId>
+              <PrimaryId db="BioProject">PRJNA553747</PrimaryId>
             </BioProject>
             <Package>SARS-CoV-2.cl.1.0</Package>
             <Attributes>
               <Attribute attribute_name="sample_name">CORVASEQ-CLT-013522</Attribute>
               <Attribute attribute_name="sars_cov_2_diag_pcr_ct_value_1">25.512339</Attribute>
-              <Attribute attribute_name="collection_date">2022-12-17 00:00:00</Attribute>
+              <Attribute attribute_name="collection_date">2022-12-17</Attribute>
               <Attribute attribute_name="gisaid_virus_name">hCoV-19/USA/NC-CORVASEQ-CLT-013522/2022</Attribute>
               <Attribute attribute_name="gisaid_accession">EPI_ISL_12346568</Attribute>
               <Attribute attribute_name="isolate">SARS-CoV-2/human/USA/CORVASEQ-CLT-013522/2022</Attribute>
@@ -207,7 +207,7 @@
       <Attribute name="loader">fastq-load.py</Attribute>
       <AttributeRefId name="BioProject">
         <RefId>
-          <PrimaryId db="BioProject">PRJNA111111</PrimaryId>
+          <PrimaryId db="BioProject">PRJNA553747</PrimaryId>
         </RefId>
       </AttributeRefId>
       <AttributeRefId name="BioSample">

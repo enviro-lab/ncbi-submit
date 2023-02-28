@@ -154,3 +154,5 @@ cython_debug/
 # Local extras
 .login_credentials
 temp*
+None_reports
+!gisaid_uploader.log

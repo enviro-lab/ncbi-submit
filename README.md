@@ -122,7 +122,7 @@ ncbi.() # TODO: finish this
   * `seq_report`: Main metadata file with sample details - can be equivalent to NCBI's BioSample TSV for use with the Submission Portal.
 ### Optional Files
   * `exclude_file`: Contains a list of "sample_name"s to exclude from NCBI submission (each one on a new line).
-  * `barcode_map`: Used as a cross-reference. If all samples from `barcode_map` appear in `seq_report`, that's great. Otherwise, you'll get a warning with directions for adding samples to the `exclude_file` if they shouldn't be submitted.
+  * `barcode_map`: Used as a cross-reference. If all samples from `barcode_map` appear in `seq_report`, that's great. Otherwise, you'll get a warning with directions for adding samples to the `exclude_file` if they shouldn't be submitted. File should have no headers. Lines must be: "{barcode}\t{sample_name}".
 ### Sometimes Required Paths
   * `fastq_dir`: Required for `file_prep` and `ftp` if submitting reads to SRA. Indicates where the fastqs should be gathered from. Any fastqs with "sample_name" values that aren't supposed to be submitted will be ignored.
   * `subdir`: Highly recommended but will defualt to "./ncbi" or "./ncbi_test". A directory to house output (submission reports, `exclude_file`, output from `file_prep`). Will be created, if needed.
@@ -131,6 +131,7 @@ ncbi.() # TODO: finish this
 ## Links to xml template examples/schema:
 | File type | BioProject | BioSample | SRA | GenBank | Description/Link
 |  --- | --- | --- | --- | --- | --- |
+| Webpage | &check; | &check; | &check; | &check; | [Protocols & TSVs for use at Submission Portal](https://www.protocols.io/view/overview-of-ncbi-39-s-sars-cov-2-submission-proces-3byl476e2lo5/v5)
 | XML | create | create | create |  | [SRA submission w/ new BioSample & BioProject](https://www.ncbi.nlm.nih.gov/viewvc/v1/trunk/submit/public-docs/sra/samples/sra.submission.bs.bp.run.xml?view=co)
 | XML | link | create | create |  | [SRA submission w/ new BioSample & existing BioProject](https://www.ncbi.nlm.nih.gov/viewvc/v1/trunk/submit/public-docs/sra/samples/sra.submission.bs.run.xml?view=co)
 | XML | link | link | create |  | [SRA submission w/ existing BioSample & BioProject](https://www.ncbi.nlm.nih.gov/viewvc/v1/trunk/submit/public-docs/sra/samples/sra.submission.run.xml?view=co)

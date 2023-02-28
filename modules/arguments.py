@@ -12,40 +12,38 @@ def add_file_prep_args(parser_file_prep):
         help="Path to sequencing report CSV")
     parser_file_prep.add_argument("--plate",required=True,
         help="Unique run or plate identifier")
+    parser_file_prep.add_argument("--barcode_map",type=Path,required=False,default=None,
+        help="Path to barcode map TSV. Used as reference to check that all samples are accounted for.")
     parser_file_prep.add_argument("--primer_map",type=Path,required=False,
         help="Path to TSV mapping of ['sample_name','Seq ID',or 'Sample #'] to ['Primer Scheme']. Used to set scheme and protocol details based on values in config.")
     parser_file_prep.add_argument("--primer_scheme",type=str,required=False,
-        help="Only used if `--primer_map` not provided. Used to set scheme and protocol details based on values in config.")
+        help="Default primer scheme for all samples. Only used if `--primer_map` not provided or contains no 'Primer Scheme' column. Used to set scheme and protocol details based on values in config.")
     parser_file_prep.add_argument("--outdir",type=Path,required=True,
         help="Path to output directory (default = ./ncbi)",default=Path("ncbi"))
     parser_file_prep.add_argument("--controls",
         help="list of names used to reference control samples (seperated by '|')")
-    # parser_file_prep.add_argument("--protocol",required=True,
-        # help="'sequencing_protocol_name' for this batch of samples")
-    # parser_file_prep.add_argument("--email",type=str,required=False, # TODO: remove
-    #     help="sequence submitter email address")
-    # parser_file_prep.add_argument("--center",type=str,required=True,dest='center_abbr',
-    #     help="center abbreviation for NCBI programmatic submissions")
     parser_file_prep.add_argument("--config",default=None,
-        help="Path to multisub config file"),
-    parser_file_prep.add_argument("--submitted",default=None,
-        help="Path to multisub config file"),
+        help="Path to config file"),
+    # parser_file_prep.add_argument("--submitted",default=None, # TODO: remove
+    #     help="Path to multisub config file"),
     # parser_file_prep.add_argument("--template",required=False,type=Path,
     #     help="Path to submission template file. If present, this overrides the template path from the config. Can be created at https://submit.ncbi.nlm.nih.gov/genbank/template/submission/")
     parser_file_prep.add_argument("--gisaid_log",required=False,type=Path,
-        help="Path to submission log from gisaid upload (of filter file in the format `virus_name; accession`) - used to indicate allowed seqs from `--fasta` and to add gisaid accession to GenBank submission")
-    parser_file_prep.add_argument("--fasta",required=True,type=Path,
+        help="Path to submission log from gisaid upload (or other filter file in the format `virus_name; accession`). Used to indicate samples that are good enough for submission and to add gisaid accession to GenBank submission.")
+    parser_file_prep.add_argument("--fasta",required=False,type=Path,
         help="Path to consensus fasta")
     parser_file_prep.add_argument("--test_dir",action="store_true",
         help="Sets submission directory to submit/Test. If not indicated, submission directory is submit/Production")
-    parser_file_prep.add_argument("--sra_only",action='store_true',
-        help="Indicates that only the SRA tsv needs to be produced") #                                      (NOTE: still testing)
+    # parser_file_prep.add_argument("--sra_only",action='store_true',
+    #     help="Indicates that only the SRA tsv needs to be produced") #    # TODO: remove                 (NOTE: still testing)
     parser_file_prep.add_argument("--biosample_accessions",type=Path,required=False,
         help="Path to biosample accession file (for mapping accessions to samples)")
     parser_file_prep.add_argument("--prep_genbank",action="store_true",
         help="Indicates that GenBank XML and Zip files should be produced, adding in BioSample accessions if available.")
     parser_file_prep.add_argument("--use_existing",action="store_true",
         help="Indicates to use existing TSV files (biosample_attributes.tsv, genbank-metadata.tsv, and sra-metadata.tsv) rather than creating them all anew. Any XML or Zip submission files will be created fresh from those TSVs. If the TSVs don't exist, they will be created.")
+    parser_file_prep.add_argument("--vary_spuid",action="store_true",
+        help="Indicates to use append `attempt_num` to SPUID. Sometimes SPUID for updates needs to be different than SPUID from older submission.")
     
 def add_ftp_args(parser_ftp):
     ## ftp
@@ -60,15 +58,22 @@ def add_ftp_args(parser_ftp):
     # parser_ftp.add_argument("--submit_bs_sra",action="store_true",help="(for sra and biosample) - submits sra_biosample.xml as submission.xml, any referenced fastqs, and submit.ready")
     # parser_ftp.add_argument("--submit_gb",action="store_true",help="(for genbank) - submits genbank.zip, genbank.xml as submission.xml, and submit.ready")
     # parser_ftp.add_argument("--check",help="options: [bs_sra, gb]. Looks for report file related to given submission. Downloads to outdir/bs_sra_reports or outdir/gb_reports")
-    parser_ftp.add_argument("--check",action="store_true",help="verify successful submission or report on issues")
-    parser_ftp.add_argument("--simple",action="store_true",help="if checking on submission, this option limits output to one line indicating submission status")
-    parser_ftp.add_argument("-u","--username",type=str,required=True,help="username - This can also be retrieved from the environmental variable 'ncbiUser'")
-    parser_ftp.add_argument("-p","--password",type=str,required=True,help="password - This can also be retrieved from the environmental variable 'ncbiPass'")
-    parser_ftp.add_argument("-o","--host",type=str,default="ftp-private.ncbi.nlm.nih.gov",help="host address")
+    parser_ftp.add_argument("--check",action="store_true",
+        help="Report on submission success. If no `db` specified, all will be checked")
+    parser_ftp.add_argument("--simple",action="store_true",
+        help="Limits submission check to specified submission `db` and `attempt_num`. If not specified, all possible `attemp_num`s will be checked")
+    parser_ftp.add_argument("-u","--username",type=str,required=False,
+        help="username - This can also be retrieved from the environmental variable 'ncbiUser'")
+    parser_ftp.add_argument("-p","--password",type=str,required=False,
+        help="password - This can also be retrieved from the environmental variable 'ncbiPass'")
+    parser_ftp.add_argument("-o","--host",type=str,default="ftp-private.ncbi.nlm.nih.gov",
+        help="host address")
     parser_ftp.add_argument("--outdir",type=Path,required=True,
         help="Path to output directory (default = ./ncbi)",default=Path("ncbi")),
-    parser_ftp.add_argument("-s","--subdir",type=str,required=True,
-        help="remote subdirectory where files will be uploaded")
+    parser_ftp.add_argument("-s","--subdir",type=str,required=False,
+        help="Prefix for remote subdirectory where files will be uploaded. `db` and `attempt_num` will be added to form the full subdirectory name. If not provided, defaults to `--plate`")
+    parser_ftp.add_argument("--plate",required=False,
+        help="Unique run or plate identifier")
     parser_ftp.add_argument("-f","--fastq_dir",type=Path,required=True,
         help="Path to local directory containing one compiled fastq file for each sample")
     parser_ftp.add_argument("-c","--controls",type=str,
@@ -136,11 +141,17 @@ def add_arguments(parser):
     parser_ftp = subparsers.add_parser("ftp",formatter_class=argparse.RawTextHelpFormatter,
         help=textwrap.dedent(
         """\
-        `--submit` will submit fastqs for all samples with gisaid accessions.
-        Fastqs will be uploaded to SRA unless the --test_mode flag is set
-        or
-        `--check` will download report.xml and look for issues
-        NOTE: only one or the other of `--submit` and `--check` can be used."""))
+        NOTE: Only use one or the other of `--submit` and `--check`.
+
+        Submissions/checks differ based on the flag `--db`:
+        * "bs": Submits BioSample metadata.
+        * "sra": Submits fastqs and SRA metadata, linking BioSample accessions if available.
+        * "bs_sra": Submits BioSample and SRA metadata linked, plus fastqs. (recommended over 'bs' or 'sra' individually)
+        * "gb": Submits fastas and genbank metadata, linking BioSample accessions if available.
+
+        `--submit`: Submits files to desired `--db`.
+        `--check`: Downloads report.xml and reports on submission status. Checks all databases if `--db` not specified.
+        """))
     
     # parser_biosample =  subparsers.add_parser("add_biosample",
     #     help="Add BioSample accessions to the previously created 'genbank-metadata.tsv'")

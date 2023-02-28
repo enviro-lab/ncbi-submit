@@ -7,13 +7,13 @@ from pathlib import Path
 from textwrap import indent,dedent
 import pandas as pd
 from modules.helpers import series2dict,get_bioproject_spuid
-# from modules.ncbi import NCBI # only use for testing (with typing hints) - otherwise looks like circular import
+# from modules.ncbi import NCBI # only use for testing (with typing hints) - otherwise causes circular import
 
 class Action(ABC):
     """Converts details about an individual sample to an XML action"""
 
     def __init__(self,ncbi,indent_by=2) -> None:
-        """Instantiates an Action"""
+        """An object that can generate the text for an xml submission <Action> block"""
 
         ncbi:NCBI
         self.ncbi = ncbi
@@ -29,6 +29,8 @@ class GenBank_Action(Action):
 
     def generate_action_lines(self):
         """Generates individual XML lines to form a single action"""
+
+        num = f"_{self.ncbi.attemtpt_num}" if self.ncbi.vary_spuid else ""
         yield indent(dedent(f"""\
             <Action>
               <AddFiles target_db="GenBank">
@@ -38,7 +40,7 @@ class GenBank_Action(Action):
                 <Attribute name="wizard">BankIt_SARSCoV2_api</Attribute>
                 <Attribute name="auto_remove_failed_seqs">no</Attribute>
                 <Identifier>
-                  <SPUID spuid_namespace="{self.ncbi.centerAbbr}">{self.ncbi.plate}.sarscov2</SPUID>
+                  <SPUID spuid_namespace="{self.ncbi.centerAbbr}">{self.ncbi.plate}.sarscov2{num}</SPUID>
                 </Identifier>
               </AddFiles>
             </Action>"""),
@@ -71,6 +73,8 @@ class SRA_BioSample_Action(Action):
             elif not str(attr_value).strip(): continue
             # this one goes somewhere special
             if "bioproject_accession" in attr_name: continue
+            # drop the time from the date (i.e. " 00:00:00")
+            if attr_name == "collection_date": attr_value = str(attr_value).split(" ")[0]
             # add attributes with different spacing for different submissions
             if self.action_type == "sra":
                 # these attributes are excluded (since they go elsewhere)
@@ -150,7 +154,7 @@ class SRA_Action(SRA_BioSample_Action):
         yield indent(self.link_bioSample(self.biosample_link),(4+self.indent_by)*" ")
         yield indent(dedent(f"""\
                 <Identifier>
-                    {self.sra_link}
+                  {self.sra_link}
                 </Identifier>
               </AddFiles>
             </Action>"""),
@@ -289,7 +293,7 @@ class Submission(ABC):
     def write_xml(self,filename):
         """Combines all XML pieces and writes to '`outfile`/`filename`'"""
 
-        with self.ncbi.outdir.joinpath(filename).open("w") as out:
+        with filename.open("w") as out:
             for line in self.generate_xml_lines():
                 end = "" if line.endswith("\n") else "\n"
                 out.write(line+end)
@@ -309,7 +313,7 @@ class GenBank_Submission(Submission):
 class SRA_BioSample_Submission(Submission):
     """Converts SRA and BioSample TSVs to submission XML"""
 
-    def __init__(self,ncbi,add_biosample=True,add_sra=True,data_type="SRA+BS") -> None:
+    def __init__(self,ncbi,add_biosample=True,add_sra=True,data_type="BS+SRA") -> None:
         """Instantiate a Submission object
         
         Attributes:
@@ -320,7 +324,7 @@ class SRA_BioSample_Submission(Submission):
             sra_df (DataFrame): df containing final data for sra_df submission
         """
 
-        super().__init__(ncbi,data_type="GB")
+        super().__init__(ncbi,data_type=data_type)
         ncbi:NCBI
         # self.ncbi = ncbi
         # self.data_type = data_type # TODO: remove?
@@ -331,13 +335,14 @@ class SRA_BioSample_Submission(Submission):
     def getSpuidOrLink(self,row,sra_only,accession_dict):
         """Returns SPUID or link for SRA and BioSample submissions"""
 
-        sra_link = f"""<SPUID spuid_namespace="{self.ncbi.centerAbbr}">{row["sample_name"]}_SRA</SPUID>"""
+        num = f"_{self.ncbi.attemtpt_num}" if self.ncbi.vary_spuid else ""
+        sra_link = f"""<SPUID spuid_namespace="{self.ncbi.centerAbbr}">{row["sample_name"]}_SRA{num}</SPUID>"""
         if sra_only:
             # assuming BioSamples were previously submitted, link to their accessions, not their name
             biosample_link = f"""<PrimaryId db="BioSample">{accession_dict[row["sample_name"]]}</PrimaryId>"""
             # xml_text = self.sra_action(row[sra_cols],sra_link,biosample_link,bioproject_accession) # temp
         else:
-            biosample_link = f"""<SPUID spuid_namespace="{self.ncbi.centerAbbr}">{row["sample_name"]}_BioSample</SPUID>"""
+            biosample_link = f"""<SPUID spuid_namespace="{self.ncbi.centerAbbr}">{row["sample_name"]}_BioSample{num}</SPUID>"""
             # xml_text = self.biosample_action(row[biosample_cols],biosample_link,plate,test_dir) + "\n" + self.sra_action(row[sra_cols],sra_link,biosample_link,bioproject_accession)
         return sra_link,biosample_link
 

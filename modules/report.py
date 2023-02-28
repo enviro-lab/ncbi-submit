@@ -7,7 +7,7 @@ import io
 import re
 
 
-class Action:
+class ActionReader:
     """Stores/retrieves details about a submission action from NCBI's report*.xml files"""
 
     def __init__(self,submission_id,submission_status,action) -> None:
@@ -139,7 +139,7 @@ class Report:
         actions = self.dom.getElementsByTagName("Action")
         for xml_action in actions:
             if xml_action.getElementsByTagName("Response"):
-                action = Action(submission_id=self.submission_id,submission_status=self.submission_status,action=xml_action)
+                action = ActionReader(submission_id=self.submission_id,submission_status=self.submission_status,action=xml_action)
                 action_dicts[action.target_db][action.sample_name] = action
                 self._store_status(action)
 
@@ -160,6 +160,8 @@ class Report:
                 num_actions += len(samples)
                 report.append(f"{status}\t{len(samples)}")
             num_processed_error = len(status_dict["processed-error"])
+            if num_processed_error > 0 and "BioSample" in db:
+                report.append("For help with BioSample errors, see:\n  https://www.ncbi.nlm.nih.gov/projects/biosample/docs/submission/validation/errors.xml")
             if num_processed_error > 0:
                 # if only some samples failed, list them
                 if num_actions != num_processed_error:

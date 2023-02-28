@@ -20,7 +20,9 @@ def main():
     ncbi = NCBI(
         fastq_dir = getattr(args,"fastq_dir",None),
         seq_report = getattr(args,"seq_report",None),
+        barcode_map = getattr(args,"barcode_map",None),
         plate = args.plate,
+        subdir = getattr(args,"subdir",None),
         outdir = args.outdir,
         config = args.config,
         gisaid_log = getattr(args,"gisaid_log",None),
@@ -42,6 +44,18 @@ def main():
 
         if args.prep_genbank:
             ncbi.write_genbank_submission_zip()
+
+    if args.action == "ftp":
+
+        if args.submit:
+            print(f"Submitting to {args.db}")
+            ncbi.submit(db=args.db,attempt_num=args.attempt_num)
+
+        if args.check:
+            print(f"Checking {args.db}")
+            ncbi.check(db=args.db,attempt_num=args.attempt_num,simple=args.simple)
+
+            
 
 
 if __name__ == "__main__":

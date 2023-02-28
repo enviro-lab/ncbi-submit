@@ -4,8 +4,8 @@
 # NCBI-Interact goes more in depth into NCBI programmatic submissions.
 
 # For testing purposes (both default to false if commented out) 
-# test_dir = True # Prepare data with test accession and submit to NCBI's Test directory
-test_mode = True # Do everything except the actual upload of data
+test_dir = True # Prepare data with test accession and submit to NCBI's Test directory
+# test_mode = True # Do everything except the actual upload of data
 
 # --- For automated NCBI uploads via FTP --
 # Some of the below values will be (not yet) used to populate the NCBI submission template file
@@ -148,9 +148,17 @@ biosample['vaccine_received'] = "Restricted Access"
 biosample['virus_isolate_of_prior_infection'] = "Restricted Access"
 biosample['description'] = ""
 
-# indicates whether genbank CSV & XML should be skipped (True) or produced (False)
-# REQUIRED GenBank attribute:
-skip_genbank = True
+genbank = {}
+# REQUIRED GenBank presets:
+genbank["comment"] = {
+    # indicates whether genbank CSV & XML should be skipped (True) or produced (False)
+    "include_comment":True,
+    "data":{}
+}
+# If including the comment file add any fields and preset values here. Not set up for individualized differences between samples
+genbank["comment"]["data"]["sequencing_technology"] = "PromethION"
+genbank["comment"]["data"]["assembly_method"] = "ARTIC-nCoV-bioinformaticsSOP"
+genbank["comment"]["data"]["assembly_version_or_date"] = "1.1.0"
 
 sra = {}
 # REQUIRED SRA attributes:
