@@ -64,7 +64,6 @@ python ncbi_interact.py ftp \
     --outdir "${NCBI_DIR}" \
     -u "${ncbi_username}" \
     -p "${ncbi_password}" \
-    --subdir "${SUBDIR}" \
     --fastq_dir "${FASTQS}"
 ```
 #### Python:
@@ -88,7 +87,6 @@ python ncbi_interact.py ftp \
     --config "${NCBI_CONFIG}" \
     -u "${ncbi_username}" \
     -p "${ncbi_password}" \
-    --subdir "${SUBDIR}" \           # TODO: remove this (here & elsewhere)
     --plate "${PLATE}" \
     --fastq_dir "${FASTQS}"
 
@@ -107,7 +105,6 @@ python ncbi_interact.py ftp \
     --outdir "${NCBI_DIR}" \
     -u "${ncbi_username}" \
     -p "${ncbi_password}" \
-    --subdir "${SUBDIR}" \
     --fastq_dir "${FASTQS}"
 ```
 #### Python:
@@ -125,7 +122,8 @@ ncbi.() # TODO: finish this
   * `barcode_map`: Used as a cross-reference. If all samples from `barcode_map` appear in `seq_report`, that's great. Otherwise, you'll get a warning with directions for adding samples to the `exclude_file` if they shouldn't be submitted. File should have no headers. Lines must be: "{barcode}\t{sample_name}".
 ### Sometimes Required Paths
   * `fastq_dir`: Required for `file_prep` and `ftp` if submitting reads to SRA. Indicates where the fastqs should be gathered from. Any fastqs with "sample_name" values that aren't supposed to be submitted will be ignored.
-  * `subdir`: Highly recommended but will defualt to "./ncbi" or "./ncbi_test". A directory to house output (submission reports, `exclude_file`, output from `file_prep`). Will be created, if needed.
+  * `outdir`: Highly recommended but will defualt to "./ncbi" or "./ncbi_test". A directory to house output (submission reports, `exclude_file`, output from `file_prep`). Will be created, if needed.
+  * `subdir`: Only used for `ftp` tasks. A prefix to use for submissions for the given dataset. Defaults to `plate`, if plate is provided.
 
 ***
 ## Links to xml template examples/schema:
