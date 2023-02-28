@@ -127,7 +127,7 @@ This works for whichever db you want to check on. If not specified, you'll get r
 
 #### Shell:
 ```console
-# submit to GenBank (NOTE: db='gb')
+# check GenBank submission (NOTE: db='gb')
 python ncbi_interact.py ftp \
     --check --db gb \
     --test_mode --test_dir \
@@ -138,7 +138,8 @@ python ncbi_interact.py ftp \
 ```
 #### Python:
 ```python
-ncbi.check(db="bs_sra)
+# check GenBank submission (NOTE: db='gb')
+ncbi.check(db="gb)
 ```
 
 
