@@ -2,15 +2,13 @@
 """A main class for preparing data and interacting with ncbi.
 """
 
-import datetime
 from ftplib import FTP
 from io import StringIO
 import os
-import textwrap
 import pandas as pd
-from modules.helpers import *
-from modules.report import Report
-from modules.xml_format import SRA_BioSample_Submission,GenBank_Submission
+from ncbi_submit.helpers import *
+from ncbi_submit.report import Report
+from ncbi_submit.xml_format import SRA_BioSample_Submission,GenBank_Submission
 from zipfile import ZipFile
 from Bio import SeqIO
 
@@ -1218,7 +1216,6 @@ class NCBI:
                 continue # only keep if fact exists for name
             # save file:fact pair
             if fact == "modify":
-                from modules.helpers import asDate
                 fact_dict[name] = asDate(details[fact])
             else:
                 fact_dict[name] = details[fact]

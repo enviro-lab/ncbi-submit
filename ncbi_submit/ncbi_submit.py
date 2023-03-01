@@ -2,8 +2,8 @@
 """A main class for preparing data and interacting with ncbi.
 """
 #Git Push test. 
-from modules.ncbi import NCBI
-from modules.arguments import add_arguments
+from ncbi_submit.ncbi import NCBI
+from ncbi_submit.arguments import add_arguments
 import argparse
 from pathlib import Path
 

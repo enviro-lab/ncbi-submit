@@ -12,7 +12,7 @@
         </Name>
       </Contact>
     </Organization>
-    <Hold release_date="2023-02-28"/>
+    <Hold release_date="2023-03-01"/>
   </Description>
   <Action>
     <AddData target_db="BioSample">

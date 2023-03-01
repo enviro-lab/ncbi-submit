@@ -6,8 +6,8 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from textwrap import indent,dedent
 import pandas as pd
-from modules.helpers import series2dict,get_bioproject_spuid
-# from modules.ncbi import NCBI # only use for testing (with typing hints) - otherwise causes circular import
+from ncbi_submit.helpers import series2dict,get_bioproject_spuid
+# from ncbi_submit.ncbi import NCBI # only use for testing (with typing hints) - otherwise causes circular import
 
 class Action(ABC):
     """Converts details about an individual sample to an XML action"""
