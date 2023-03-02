@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """A main class for preparing data and interacting with ncbi.
 """
-#Git Push test. 
+
 from ncbi_submit.ncbi import NCBI
 from ncbi_submit.arguments import add_arguments
 import argparse, logging

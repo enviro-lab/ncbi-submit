@@ -13,6 +13,18 @@ conda create -n ncbi ncbi-submit
 ```
 
 ***
+## Testing
+Add NCBI credentials to file `./.login_credentials` or edit them in either:
+* `./example/test.sh` or
+* `./config/config.py`
+
+To test creating all example files, run:
+```console
+./example/test.sh
+```
+This script ^^^ could also be a good starting point for your own NCBI submission pipelines. Note: There are several blocks of code in there can be commented in/out, as needed.
+
+***
 ## Usage
 
 `ncbi_interact.py` is intended for use on the command line, but the class `ncbi.NCBI` can be imported and used within custom python scripts.
