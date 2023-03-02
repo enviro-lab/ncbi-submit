@@ -2,6 +2,17 @@
 Submitting data to public databases is super important for publically funded laboratories, but it is not always a quick or intuitive process. NCBI Interact provides a simple and repeatable way to upload programmatic submissions to NCBI's SRA and GenBank with shared or unique BioProjects and BioSamples. Data can be uploaded as XML or zip files to either the Test or Production environments, and once there, the reports produced by NCBI can be analyzed to check on submission status and get BioSample accessions.
 
 ***
+## Installation:
+To install from PyPI:
+```console
+pip install ncbi-submit
+```
+To install from conda (not yet set up):
+```console
+conda create -n ncbi ncbi-submit
+```
+
+***
 ## Usage
 
 `ncbi_interact.py` is intended for use on the command line, but the class `ncbi.NCBI` can be imported and used within custom python scripts.

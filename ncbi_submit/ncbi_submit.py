@@ -4,19 +4,22 @@
 #Git Push test. 
 from ncbi_submit.ncbi import NCBI
 from ncbi_submit.arguments import add_arguments
-import argparse
-from pathlib import Path
+import argparse, logging
+
 
 def parse_args():
     p = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
     add_arguments(p)
     args = p.parse_args()
+    # set logging level, if needed
+    logging.basicConfig(filename='ncbi-submit.log', encoding='utf-8', level=getattr(logging,args.log,None))
     return args
 
 def main():
     args = parse_args()
-    print("args:")
-    print(args)
+    logging.info("args:")
+    logging.info(args)
+
     ncbi = NCBI(
         fastq_dir = getattr(args,"fastq_dir",None),
         seq_report = getattr(args,"seq_report",None),

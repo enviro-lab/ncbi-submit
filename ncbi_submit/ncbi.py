@@ -4,7 +4,8 @@
 
 from ftplib import FTP
 from io import StringIO
-import os
+import os, logging
+from textwrap import dedent
 import pandas as pd
 from ncbi_submit.helpers import *
 from ncbi_submit.report import Report
@@ -128,8 +129,9 @@ class NCBI:
 
         outdir = Path(outdir)
         if self.test_dir and "test" not in outdir.name:
-            print("Resetting outdir --> test")
-            return outdir.parent / f"{outdir.name}_test"
+            outdir = outdir.parent / f"{outdir.name}_test"
+            print(f"Resetting outdir --> {outdir}")
+            return outdir
         return outdir
 
     def _check_login(self,missing_ok=True):
@@ -220,10 +222,10 @@ class NCBI:
         """Raises ValueError if any 'sample_name' in `df` was already-submitted"""
 
         if not self.submitted_samples_file:
-            print(f"`submitted_samples` file not provided in `config_file`. Not checking for previously submitted samples.")
+            logging.warning(f"`submitted_samples` file not provided in `config_file`. Not checking for previously submitted samples.")
             return
         if not Path(self.submitted_samples_file).exists():
-            print(f"Couldn't find file: {self.submitted_samples_file}. Not checking for previously submitted samples.")
+            logging.warning(f"Couldn't find file: {self.submitted_samples_file}. Not checking for previously submitted samples.")
             return
         submitted = pd.read_csv(self.submitted_samples_file,header=None,names=["already_submitted"])["already_submitted"].unique()
         attempted_duplicate = df[df["sample_name"].isin(submitted)]
@@ -280,7 +282,7 @@ class NCBI:
             return self.biosample["df"]
         # create new df
         if self.use_existing:
-            print("Reading in sra df - not creating it fresh")
+            logging.info("Reading in sra df - not creating it fresh")
             biosample_df = pd.read_csv(self.biosample["tsv"],sep="\t")
             actual_cols = list(biosample_df.columns)
         else:
@@ -335,9 +337,7 @@ class NCBI:
                 required_bs_attr = ["sample_name","organism","collected_by","collection_date","geo_loc_name","isolation_source"]
             else: # This assumes the user hasn't forgotten any necessary columns. NCBI submission will fail if important attributes are missing, anyway...
                 required_bs_attr = []
-            # print("reqs:",required_bs_attr)
             all_bs_cols = [x.strip() for x in self.biosample_presets.get("all_cols","").split(",") if x]
-            # print("abc:",all_bs_cols)
             if not all_bs_cols:
                 all_bs_cols = ['sample_name','sample_title','bioproject_accession','organism','collected_by','collection_date','geo_loc_name','host','host_disease','isolate','isolation_source','antiviral_treatment_agent','collection_device','collection_method','date_of_prior_antiviral_treat','date_of_prior_sars_cov_2_infection','date_of_sars_cov_2_vaccination','exposure_event','geo_loc_exposure','gisaid_accession','gisaid_virus_name','host_age','host_anatomical_material','host_anatomical_part','host_body_product','host_disease_outcome','host_health_state','host_recent_travel_loc','host_recent_travel_return_date','host_sex','host_specimen_voucher','host_subject_id','lat_lon','passage_method','passage_number','prior_sars_cov_2_antiviral_treat','prior_sars_cov_2_infection','prior_sars_cov_2_vaccination','purpose_of_sampling','purpose_of_sequencing']
                 all_bs_cols.extend(ct_cols)
@@ -345,13 +345,7 @@ class NCBI:
             if ignore_dates:
                 required_bs_attr = remove_item("collection_date",required_bs_attr)
                 all_bs_cols = remove_item("collection_date",all_bs_cols)
-            # print("seq_report_df cols:\n",seq_report_df.columns)
-            # bs_temp_cols = ["sample_name_short",]
-            # actual_cols = [col for col in all_bs_cols+bs_temp_cols if col in biosample.columns]
-            # extra_cols = [col for col in biosample_df.keys() if col not in set(all_bs_cols)]
-            # print("extras:",extra_cols)
             actual_cols = [col for col in all_bs_cols if col in biosample_df.columns]
-            # print(actual_cols)
             check_missing(actual_cols,required_cols=required_bs_attr,name="BioSample")
             # biosample_df = biosample_df[actual_cols] # NOTE doing this later (before writing tsv and xml)
             ensureAllSamplesHaveNames(biosample_df)
@@ -362,22 +356,22 @@ class NCBI:
                 barcode_df_filtered = self.barcode_df[~self.barcode_df['sample_name'].isin(self._findExcludables())]
                 extras = set(barcode_df_filtered["sample_name"].unique()) - set(biosample_df["sample_name"].unique())
                 if len(extras) > 0:
-                    print("\nWARNING:\nSamples exist in barcode file that aren't found in BioSample file:\n\t" + str(extras))
-                    print(f"Any sample can be skipped by writing it in a line by itself in a file called:\n"
-                        f"{self.exclude_file}\n"
-                        f"If {'these samples' if len(extras)!=1 else 'this sample'} should be excluded from submissions, you can use this command:")
+                    logging.warning(dedent(f"""
+                        Samples exist in barcode file that aren't found in BioSample file:
+                        \t{extras}
+                        Any sample can be skipped by writing it in a line by itself in a file called:
+                        {self.exclude_file}
+                        If {'these samples' if len(extras)!=1 else 'this sample'} should be excluded from submissions, you can use this command:"""))
                     for sample in extras:
                         print(f"echo '{sample}' >> '{self.exclude_file}'")
                     warn("")
             # ensure all samples present have not been previously submitted
             self._ensure_new_names_only(biosample_df)
 
-        print("BioSample")
-        # print(biosample[["sample_name_short","bioproject_accession"]])
-        print(biosample_df)
+        logging.info("BioSample")
+        logging.info(biosample_df)
         self.biosample["final_cols"] = actual_cols
 
-        # print(biosample_df.columns)
         self.biosample["df"] = biosample_df
         return biosample_df
 
@@ -422,13 +416,12 @@ class NCBI:
             else:
                 # search for report with accessions
                 for file in sorted([f for f in self.report_dir.glob("*/report.*") if f.name != "report.xml"],reverse=True):
-                    # print(f"checking {file} for accessions")
+                    logging.info(f"Checking {file} for accessions")
                     report = Report(file)
                     if report.biosamplesOk():
                         accessions_in_file = report.getAccessionDict(by_sample_name=True)
                         if accessions_in_file:
-                            print("found accessions in",file)
-                            # print(accessions_in_file)
+                            logging.info("Found accessions in",file)
                             accessions.update(accessions_in_file)
             if as_df:
                 return pd.DataFrame(accessions.items(),columns=["Sequence_ID","BioSample"])
@@ -445,7 +438,7 @@ class NCBI:
 
         # read in dfs
         if self.use_existing:
-            print("Reading in genbank df - not creating it fresh")
+            logging.warning("Reading in genbank df - not creating it fresh")
             genbank_df = pd.read_csv(self.genbank["tsv"],sep="\t")
         else:
             genbank_df = self.genbank["df"]
@@ -453,14 +446,13 @@ class NCBI:
                 self.prep_dfs(add_biosample=False)
         
         # only add biosamples if not already present
-        print(genbank_df["BioSample"])
         if genbank_df["BioSample"].isnull().values.any() or "Missing" in genbank_df["BioSample"].unique():
             g_cols = genbank_df.columns
             genbank_df = genbank_df.drop(columns="BioSample")
-            print("reading in accessions")
+            logging.info("reading in accessions")
             accessions_df = self.get_accessions(as_df=True,biosample_accessions=biosample_accessions,require_biosample=require_biosample)
 
-            print("merging")
+            logging.info("merging in accessions")
             genbank_df = genbank_df.merge(accessions_df,on="Sequence_ID",how="outer")[g_cols]
             genbank_df = genbank_df[genbank_df['note'].notna()]
 
@@ -469,7 +461,7 @@ class NCBI:
             if genbank_df["BioSample"].isnull().values.any() or "Missing" in genbank_df["BioSample"].unique():
                 raise AttributeError(f"BioSample accessions could not be added. They may not yet exist in logs. Try running with flags `ftp --check` or `--biosample_accessions`")
 
-        print(genbank_df)
+        logging.info(genbank_df)
         self.genbank["df"] = genbank_df
         return genbank_df
 
@@ -494,7 +486,7 @@ class NCBI:
         """
 
         if self.use_existing:
-            print("Reading in genbank df - not creating it fresh")
+            logging.warning("Reading in genbank df - not creating it fresh")
             genbank_df = pd.read_csv(self.genbank["tsv"],sep="\t")
         else:
             cols = ['sample_name','organism','geo_loc_name', 'host', 'isolate', 'collection_date', 'isolation_source', 'bioproject_accession', 'gisaid_accession']
@@ -510,9 +502,8 @@ class NCBI:
             genbank_df = genbank_df[new_cols]
             genbank_df = genbank_df.rename(columns={'sample_name':'Sequence_ID','geo_loc_name':'country', 'host':'host', 'isolate':'isolate', 'collection_date':'collection-date', 'isolation_source':'isolation-source', 'biosample_accession':'BioSample', 'bioproject_accession':'BioProject', 'gisaid_accession':'note'})
         
-        print("GENBANK")
-        print(genbank_df)
-        # print(genbank.columns)
+        logging.info("GENBANK")
+        logging.info(genbank_df)
         self.genbank["df"] = genbank_df
         self.genbank["final_cols"] = list(genbank_df.columns)
 
@@ -656,7 +647,7 @@ class NCBI:
             return self.sra["df"]
         # create new df
         if self.use_existing:
-            print("Reading in sra df - not creating it fresh")
+            logging.warning("Reading in sra df - not creating it fresh")
             sra_df = pd.read_csv(self.sra["tsv"],sep="\t")
         else:
             # get repeated fields from BioSample
@@ -704,15 +695,15 @@ class NCBI:
         # sra_df = sra_df[actual_cols] # NOTE doing this later (before writing tsv and xml)
         check_missing(actual_cols,required_sra_cols,"SRA")
 
-        print("SRA")
-        print(sra_df)
+        logging.info("SRA")
+        logging.info(sra_df)
         self.sra["df"] = sra_df
         self.sra["final_cols"] = actual_cols
         return sra_df
 
     # def merge_dfs(self,data,df_names):
     def _prep_merged_df(self):
-        """Creates combined df of all samples/attributes"""
+        """Returns combined DataFrame of all samples/attributes"""
 
         biosample_df, sra_df, genbank_df = [getattr(self,dataset)["df"] for dataset in ("biosample","sra","genbank")]
         biosample_df:pd.DataFrame
@@ -721,27 +712,12 @@ class NCBI:
         # create merged df (before genbank['sample_title'] gets dropped)
         s1=set(biosample_df.columns)
         s2=set(sra_df.columns)
-        # sra_extras = [col for col in s1.intersection(s2) if col != 'sample_name_short']
-        # merged = biosample.merge(sra.drop(columns=sra_extras),on='sample_name_short',how='outer')
-        # sra_extras = [col for col in s1.intersection(s2) if col != "sample_name"]
         sra_extras = remove_item('sample_name',s1.intersection(s2))
-        # print(biosample.columns)
-        # print(sra.drop(columns=sra_extras).columns)
         merged_df = biosample_df.merge(sra_df.drop(columns=sra_extras),on='sample_name',how='outer')
-        # print(merged_df['sample_name'])
-        # exit()
         if not genbank_df.empty:
             s3=set(genbank_df.columns)
-            # genbank_extras = [col for col in s1.intersection(s3) if col != 'sample_name_short']
-            # merged = merged.merge(genbank.drop(columns=genbank_extras),on='sample_name_short',how='outer')
-            # genbank_extras = list(s1.intersection(s3))
-            # genbank_extras = [col for col in s1.intersection(s3) if col != 'sample_name']
             genbank_extras = remove_item('sample_name',s1.intersection(s3))
-            # print(genbank_df['sample_name'])
-            # print(genbank_extras)
-            # exit()
             merged_df = merged_df.merge(genbank_df.drop(columns=genbank_extras),left_on='sample_name',right_on='Sequence_ID',how='outer')
-        # print(merged)
         self.merged["df"] = merged_df
         return merged_df
 
@@ -781,7 +757,7 @@ class NCBI:
         """Prints warning and recommends marking samples for exclusion if needed"""
 
         if len(samples_to_maybe_exclude) != 0:
-            print(f"WARNING: {warning}")
+            logging.warning(warning)
             self._offer_skip_option(samples_to_maybe_exclude)
             exit(1)
 
@@ -794,7 +770,7 @@ class NCBI:
 
         allowed_samples = self.get_gisaid_submitted_samples()
         if allowed_samples == "all":
-            print(f"WARNING: no `gisaid_log` provided, so assuming all samples from `seq_report` should be submitted excluding any found in {self.exclude_file}")
+            logging.warning(f"No `gisaid_log` provided, so assuming all samples from `seq_report` should be submitted excluding any found in {self.exclude_file}")
             # NOTE: filtering out samples from `self.exclude_file` has already been done in TSV prep
             return all_samples
         gisaid_extras = set(allowed_samples) - set(all_samples)
@@ -949,7 +925,7 @@ class NCBI:
             )
 
         # prepare/write XML
-        print(f'writing sra/biosample xml:\n   {self.sra["xml_file"]}')
+        print(f'Writing sra/biosample xml:\n   {self.sra["xml_file"]}')
         self.write_sra_biosample_xml()
 
     def write_genbank_submission_zip(self,biosample_accessions=None):
@@ -963,9 +939,9 @@ class NCBI:
           * genbank.zip (seqs.sbt, seqs.fsa, seqs.src, [comment.cmt])
         """
 
-        print(f"writing genbank xml:\n   {self.genbank['xml_file']}")
+        print(f"Writing genbank xml:\n   {self.genbank['xml_file']}")
         self.write_genbank_xml()
-        print(f"writing genbank zip:\n   {self.genbank['zip_file']}")
+        print(f"Writing genbank zip:\n   {self.genbank['zip_file']}")
         self.write_genbank_zip(biosample_accessions)
 
 
@@ -1013,7 +989,7 @@ class NCBI:
 
         # navigate to submit/Test or submit/Production
         self.ftp.cwd(self.submit_area)
-        print(f"CWD = submit_area: {self.ftp.pwd()}\n")
+        logging.info(f"CWD = submit_area: {self.ftp.pwd()}\n")
 
     def ensureValidDatabase(self,db):
         """Raises ValueError if `db` is invalid"""
@@ -1035,7 +1011,6 @@ class NCBI:
 
         # set list of any existing submissions
         self.initial_submission_dirs = sorted(self.ftp.nlst())
-        print("isd:",self.initial_submission_dirs)
 
         # submit or check
         if action == "submit":
@@ -1067,11 +1042,11 @@ class NCBI:
 
     def enterLocalDir(self,directory):
         """Makes `directory`, if needed, and enters it"""
-        
+
         directory = Path(directory)
         directory.mkdir(parents="True",exist_ok="True")
+        logging.info(f"Moving to '{directory}'")
         os.chdir(directory)
-        # print("Now in",os.getcwd())
     
     def upload(self,file:Path,outfile=None):
         """Uploads `file` to submission dir as outfile"""
@@ -1088,16 +1063,14 @@ class NCBI:
     def upload_if_not_there(self,file:Path):
         "Only uploads files with name/filesize combinations that don't already exist in submission dir"
         if Path != type(file) == str : file = Path(file)
-        else: raise Exception(f"unexpected file type for {file}: {type(file)}")
+        else: raise Exception(f"Unexpected file type for {file}: {type(file)}")
         if not file.exists():
-            print(Path(".").resolve())
-            print(os.listdir())
-            raise FileNotFoundError(file)
+            raise FileNotFoundError(f"Can't upload non-existent file: {file}")
         # if expected file exists with expected size, don't upload
         outfile = "submission.xml" if file.name.endswith(".xml") else file.name
         # allow small (non-fastqs (xmls)) to be updated whether size changed or not (but don't re-upload fastqs)
         if "fastq" in outfile and outfile in self.ftp_file_sizes.keys() and int(self.ftp_file_sizes[outfile]) == int(file.stat().st_size):
-            print(f"skipping upload of existing file: {file.name}")
+            print(f"Skipping upload of existing file: {file.name}")
             return
         self.upload(file,outfile)
 
@@ -1105,7 +1078,7 @@ class NCBI:
         """Appends `sample_name` to `submitted_samples` file if `submitted_samples` provided (and not `test_mode`)"""
 
         if self.test_mode:
-            print(f"would be adding {sample_name} to {self.submitted_samples_file}")
+            print(f"Would be adding {sample_name} to {self.submitted_samples_file}")
             return
         if self.submitted_samples_file:
             with open(self.submitted_samples_file,"a") as out:
@@ -1116,11 +1089,14 @@ class NCBI:
 
         # list all files in current dir
         mlsd_size = [x for x in self.ftp.mlsd(facts=["size"])]
-        # write details to stdout
+        self.ftp_file_sizes = {}
+        logging.info("File sizes at NCBI:")
         for name,details in mlsd_size:
-            print(name,details,"size" in details.keys())
-        # Only keep files that have size info available
-        self.ftp_file_sizes = {name:details["size"] for name,details in mlsd_size if "size" in details.keys()}
+            # write details to stdout
+            logging.info(name,details,"size" in details.keys())
+            # Only keep files that have size info available
+            if "size" in details.keys():
+                self.ftp_file_sizes[name]=details["size"]
 
     def mark_submit_ready(self):
         """Creates submit.ready file, if anything was submitted"""
@@ -1147,19 +1123,18 @@ class NCBI:
             print(f"\nMaking subdir: {subdir}")
             self.ftp.mkd(subdir)
         else:
-            message = f"Subdirectory '{subdir}' already exists. We assume you are finishing an incomplete submission or updating a previous submission."
-            print(message)
-            # warn(message)
+            logging.warning(f"Subdirectory '{subdir}' already exists. "
+                "We assume you are finishing an incomplete submission or updating a previous submission.")
             
         # move into submission directory
         self.ftp.cwd(subdir)
-        print(f"\nCWD = subdir: {self.ftp.pwd()}\n")
+        logging.info(f"\nCWD = subdir: {self.ftp.pwd()}\n")
 
         # move to directory of files to upload
-        print("Moving to local dir:",self.outdir)
+        logging.info("Moving to local dir:",self.outdir)
         self.enterLocalDir(self.outdir)
-        print("Current local files:")
-        print(os.listdir())
+        logging.info("Current local files:")
+        logging.info(os.listdir())
 
         # get file sizes as dict {filename:size}
         self.set_ftp_file_sizes()
@@ -1190,8 +1165,8 @@ class NCBI:
 
         self.mark_submit_ready()
 
-        # show current files
-        print(f"Current files in {self.ftp.pwd()}:")
+        # show current files at NCBI
+        print(f"Current files in remote dir '{self.ftp.pwd()}':")
         print(self.ftp.nlst())
 
     ### ^^ submit
@@ -1229,30 +1204,36 @@ class NCBI:
                 `True`: yields str: "filename   time_stamp"
                 `False`: yields tuple (filename, time_stamp)
         """
+
         # this ignores the simlink file report.xml
-        # print(self.ftp.nlst())
         mod_times = self.getFileFact("modify","report.")
-        # print("mod_times:",mod_times)
+        logging.info("mod_times:",mod_times)
         for report_file in sorted(list(mod_times.keys())):
             if as_str: yield f"{report_file}\t{mod_times[report_file]}"
             else: yield (report_file,mod_times[report_file])
 
-    def isRequestedAttempt(self,submission_dir,attempt_num,subdir):
+    def isRequestedAttempt(self,submission_dir,subdir,attempt_num=1): #TODO: deprecate?
         """Returns True if `submission_dir` is the one requested based on the args `subdir` and `attempt_num`
         
+        No longer used.
         Args:
-            `submission_dir` (str): must just be the basename of the file (not a full path)
+            submission_dir (str): must just be the basename of the file (not a full path)
+            subdir (str): spedific subdirectory name of this submission
+            attempt_num (int|str): the attempt number of this submission
         """
+
         expected_end = f"_{attempt_num}" if attempt_num > 1 else ""
         expected_ncbi_name = f"{subdir}{expected_end}"
-        # print("isRequestedAttempt - comparing",submission_dir,"=",expected_ncbi_name)
         return submission_dir == expected_ncbi_name
 
     def enterNcbiSubdir(self,ncbi_dir):
-        """Moves to remote NCBI submission directory"""
+        """Moves to remote NCBI submission directory
+        
+        Args:
+            ncbi_dir (str): name of a subdirectory of interest within the current `submit_area`
+        """
 
-        print(f"\nIn {self.ftp.pwd()}\n")
-        print(f"\nMoving to {self.submit_area}/{ncbi_dir}\n")
+        logging.info(f"Moving from {self.ftp.pwd()} --> {self.submit_area}/{ncbi_dir}")
         self.ftp.cwd(ncbi_dir)
         return True
 
@@ -1261,19 +1242,11 @@ class NCBI:
 
         return len(set(f for f in self.ftp.nlst() if f.startswith("report.")))
 
-    def enterLocalDir(self,directory):
-        """Makes `directory`, if needed, and enters it"""
-
-        directory = Path(directory)
-        directory.mkdir(parents="True",exist_ok="True")
-        os.chdir(directory)
-        # print("Now in",os.getcwd())
-
     def relativePathToPrevDir(self,prev_dir,current_dir):
         """Returns relative path to previous directory. Full paths must be used."""
 
         prev_dir,current_dir = str(prev_dir),str(current_dir)
-        # print(prev_dir,current_dir)
+        logging.info("Moving from",prev_dir,"-->",current_dir)
         # if going from a/b/c/d --> a/b
         if current_dir.startswith(prev_dir):
             remainder = current_dir[len(prev_dir):]
@@ -1287,21 +1260,16 @@ class NCBI:
     def downloadReportFiles(self,report_dir):
         """Downloads all report*.xml files"""
 
-        # print("CWD:",self.ftp.pwd())
-        # print("files:",ftp.nlst())
-        # print("CWD:",os.getcwd())
-        # print("files:",os.listdir())
         # enter localdownload directory
         starting_dir = os.getcwd()
         self.enterLocalDir(report_dir)
-        # enterLocalDir(submit_dir)
         for file in self.ftp.nlst():
             if file.startswith("report.") and file.endswith(".xml"):
-                print(f"downloading: {file} to {os.getcwd()}/{file}")
+                print(f"Downloading '{file}' to '{os.getcwd()}/{file}'")
                 self.ftp.retrbinary("RETR " + file, open(file, 'wb').write)
         # return to original dir
+        logging.info(f"Moving to '{starting_dir}'")
         os.chdir(starting_dir)
-        print("CWD:",self.ftp.pwd())
 
     def isReportFile(self,file) -> bool:
         """Returns True for files that are named like report files (report*.xml)"""
@@ -1327,7 +1295,7 @@ class NCBI:
         """Prints comprehensive details from `report_file`"""
 
         report = Report(report_file)
-        print(f"\n\tReport file: {report_file}")
+        print(f"\n\tReport file: '{report_file}'")
         print(f"\n\t\tOverall status:\n\t\t\t{report.simpleReport()}")
         report_list = report.statusReport(self.test_dir)
         if len(report_list) == 0:
@@ -1340,33 +1308,19 @@ class NCBI:
     def setSubdir(self,db,attempt_num=1):
         """Ensures submission directory is correct for the given database if checking both"""
 
-        print(f"setting subdir based on subdir='{self.subdir}' db='{db}'")
+        logging.info(f"setting subdir based on subdir='{self.subdir}' db='{db}'")
         db_str = f"_{db}" if db else ""
         num = f"_{attempt_num}" if attempt_num > 1 else ""
         actual_subdir = f"{self.subdir}{db_str}{num}"
         return actual_subdir
-        # other_dbs = (set(self.valid_dbs) - set([db]))
-        # other_dbs.add("both")
-        # print(other_dbs)
-        # # other_db = other_dbs.pop() if len(other_dbs) == 1 else warn("setSubdir: other_db could not be determined")
-        # # convert some_name_x* -> some_name_db*
-        # for other_db in other_dbs:
-        #     print("checking for",other_db,"in",self.subdir)
-        #     if f"_{other_db}" in self.subdir:
-        #         # print(f"subdir: {subdir} ",end="")
-        #         subdir = self.subdir.replace(f"_{other_db}",f"_{db}")
-        #         if attempt_num > 1:
-        #             subdir = f"{subdir}_{attempt_num}"
-        #         print(f"-> {subdir}")
-        #         break
-        # # exit()
-        # return subdir
 
     def analyze_and_report(self,db,relevant_submission_dirs,local_db_report_dir,attempt_num,subdir):
-        """Seeks useful details about submission and prints findings"""
+        """Seeks useful details about submission(s) if extant and prints findings"""
 
-        # print overview of db submission
-        if len(relevant_submission_dirs) > 0:
+        if len(relevant_submission_dirs) == 0:
+            print("No submissions found for the database",db)
+            return
+        elif len(relevant_submission_dirs) > 0:
             print(f"\nChecking on '{db}' submission")
         elif len(relevant_submission_dirs) > 1:
             print(f"\nChecking all related submission dirs:\n\t{relevant_submission_dirs}")
@@ -1375,7 +1329,6 @@ class NCBI:
         for submission_dir in relevant_submission_dirs:
 
             starting_dir = os.getcwd()
-            # print(ftp.pwd(),"-->",submission_dir)
             self.enterNcbiSubdir(submission_dir)
             isEmpty = len(self.ftp.nlst()) == 0
 
@@ -1387,7 +1340,7 @@ class NCBI:
                 if self.numReports() > 0:
                     self.downloadReportFiles(report_dir)
                 else:
-                    print("No submission reports available for",submission_dir)
+                    print(f"No submission reports available for '{submission_dir}'")
                     return
 
                 # print overview of db submission attempt
@@ -1414,18 +1367,13 @@ class NCBI:
         # will only check submission directories related to this `subdir`
         relevant_submission_dirs = [dir for dir in self.initial_submission_dirs if dir.startswith(db_subdir)]
         if relevant_submission_dirs:
-            print("subdir:",db_subdir)
-            print("relevant_submission_dirs:",relevant_submission_dirs)
+            logging.info("subdir:",db_subdir)
+            logging.info("relevant_submission_dirs:",relevant_submission_dirs)
         if simple: # wean down to the one current submission directory (based on `attempt_num`)
             expected_end = str(attempt_num) if attempt_num > 1 else db_subdir
             relevant_submission_dirs = [dir for dir in relevant_submission_dirs if dir.endswith(expected_end)]
 
-        # skip analysis if no submission yet present
-        if len(relevant_submission_dirs) == 0:
-            print("No submissions found for the database",db)
-        # do analysis
-        else:
-            self.analyze_and_report(db,relevant_submission_dirs,local_db_report_dir,attempt_num,db_subdir)
+        self.analyze_and_report(db,relevant_submission_dirs,local_db_report_dir,attempt_num,db_subdir)
 
     def _do_check(self,db,attempt_num=1,simple=False):
         """Checks on submission status. If `db` specified, only checks the one. Otherwise checks on any found.

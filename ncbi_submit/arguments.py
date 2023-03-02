@@ -10,8 +10,8 @@ def add_file_prep_args(parser_file_prep):
         help="Path to directory containing one compiled fastq file for each sample")
     parser_file_prep.add_argument("--seq_report",type=Path,required=True,
         help="Path to sequencing report CSV")
-    parser_file_prep.add_argument("--plate",required=True,
-        help="Unique run or plate identifier")
+    # parser_file_prep.add_argument("--plate",required=True,
+    #     help="Unique run or plate identifier")
     parser_file_prep.add_argument("--barcode_map",type=Path,required=False,default=None,
         help="Path to barcode map TSV. Used as reference to check that all samples are accounted for.")
     parser_file_prep.add_argument("--primer_map",type=Path,required=False,
@@ -72,8 +72,8 @@ def add_ftp_args(parser_ftp):
         help="Path to output directory (default = ./ncbi)",default=Path("ncbi")),
     parser_ftp.add_argument("-s","--subdir",type=str,required=False,
         help="Prefix for remote subdirectory where files will be uploaded. `db` and `attempt_num` will be added to form the full subdirectory name. If not provided, defaults to `--plate`")
-    parser_ftp.add_argument("--plate",required=False,
-        help="Unique run or plate identifier")
+    # parser_ftp.add_argument("--plate",required=True,
+    #     help="Unique run or plate identifier")
     parser_ftp.add_argument("-f","--fastq_dir",type=Path,required=True,
         help="Path to local directory containing one compiled fastq file for each sample")
     parser_ftp.add_argument("-c","--controls",type=str,
@@ -117,14 +117,17 @@ def add_ftp_args(parser_ftp):
 #         help="Path to submission template file. If present, this overrides the template path from the config. Can be created at https://submit.ncbi.nlm.nih.gov/genbank/template/submission/")
 
 
-def add_arguments(parser):
+def add_arguments(parser:argparse.ArgumentParser):
     """Add all aruments to ncbi_interact argument parser
 
     Args:
         parser: ArgumentParser
     """
 
-    parser.add_argument("--plate",nargs=1,default="",help="unique run or plate identifier")
+    from ncbi_submit.version import __version__
+    parser.add_argument("--plate",required=True,help="Unique run or plate identifier")
+    parser.add_argument('-V', '--version', action='version', version="%(prog)s ("+__version__+")")
+    parser.add_argument("--log",choices=["DEBUG","WARNING","INFO"],required=False,default=None,help="Sets logging level.")
     subparsers = parser.add_subparsers(
         help="Prepare NCBI submission TSVs or submit to NCBI using one of these actions",dest="action")
     parser_file_prep = subparsers.add_parser("file_prep",formatter_class=argparse.RawTextHelpFormatter,

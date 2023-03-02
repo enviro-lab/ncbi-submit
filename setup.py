@@ -19,7 +19,7 @@ URL = 'https://github.com/enviro-lab/ncbi_interact'
 EMAIL = 'skunklem@uncc.edu'
 AUTHOR = 'Sam Kunkleman'
 REQUIRES_PYTHON = '>=3.8'
-VERSION = '0.2.8'
+VERSION = ''
 
 # What packages are required for this module to be executed?
 REQUIRED = [
@@ -51,7 +51,7 @@ except FileNotFoundError:
 about = {}
 if not VERSION:
     project_slug = NAME.lower().replace("-", "_").replace(" ", "_")
-    with open(os.path.join(here, project_slug, '__version__.py')) as f:
+    with open(os.path.join(here, project_slug, 'version.py')) as f:
         exec(f.read(), about)
 else:
     about['__version__'] = VERSION
