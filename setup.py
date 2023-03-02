@@ -18,8 +18,8 @@ DESCRIPTION = 'A tool for submitting to NCBI (SRA, BioSample, & GenBank).'
 URL = 'https://github.com/enviro-lab/ncbi_interact'
 EMAIL = 'skunklem@uncc.edu'
 AUTHOR = 'Sam Kunkleman'
-REQUIRES_PYTHON = '>=3.6.0'
-VERSION = '0.2.2'
+REQUIRES_PYTHON = '>=3.8'
+VERSION = '0.2.3'
 
 # What packages are required for this module to be executed?
 REQUIRED = [
