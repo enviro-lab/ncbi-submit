@@ -22,12 +22,12 @@ ncbi_submit \
     --primer_map "${plate_dir}/primer_map-01-06-23-1-V2A.csv" \
     --gisaid_log "${plate_dir}/gisaid_uploader.log"
 
-# Do XML submission for BioSample and SRA
-ncbi_submit \
-    ftp --submit --db 'bs_sra' \
-    --plate '01-06-23-1-V2A' \
-    --fastq_dir "${plate_dir}/fastqs/" \
-    --outdir "${plate_dir}/ncbi/" 
+# # Do XML submission for BioSample and SRA
+# ncbi_submit \
+#     ftp --submit --db 'bs_sra' \
+#     --plate '01-06-23-1-V2A' \
+#     --fastq_dir "${plate_dir}/fastqs/" \
+#     --outdir "${plate_dir}/ncbi/" 
 
 ## Wait 10 minutes for first reports to become available
 ## Waiting longer may be necessary if BioSamples take longer to be created 
