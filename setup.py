@@ -19,7 +19,7 @@ URL = 'https://github.com/enviro-lab/ncbi_interact'
 EMAIL = 'skunklem@uncc.edu'
 AUTHOR = 'Sam Kunkleman'
 REQUIRES_PYTHON = '>=3.8'
-VERSION = '0.2.7'
+VERSION = '0.2.8'
 
 # What packages are required for this module to be executed?
 REQUIRED = [

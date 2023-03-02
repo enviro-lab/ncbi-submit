@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ncbi-submit"
-version = "0.2.7"
+version = "0.2.8"
 description = "A tool for submitting to NCBI (SRA, BioSample, & GenBank)."
 license = "MIT"
 authors = [
@@ -18,7 +18,7 @@ packages = [
 
 [tool.poetry.dependencies]
 python = ">=3.8"
-pandas = ">=1.5.*"
+pandas = "*"
 biopython = "*"
 
 [tool.poetry.scripts]
