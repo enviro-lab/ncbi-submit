@@ -19,7 +19,7 @@ packages = [
 [tool.poetry.dependencies]
 python = ">=3.8"
 pandas = ">=1.5.*"
-biopython = ">=1.7*"
+biopython = ">=1.70"
 
 [tool.poetry.scripts]
 ncbi_submit = 'ncbi_submit.ncbi_submit:main'
