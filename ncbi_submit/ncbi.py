@@ -288,20 +288,38 @@ class NCBI:
         else:
             # ^^ return existing df or vv create anew
             seq_report_df = self.seq_report_df
+
             # get variables from seq_report_df and set column headers to match those in template
             starting_cols = [x.strip() for x in self.biosample_presets.get("all_cols","").split(",") if x.strip() in seq_report_df.columns]
+            
+            # add derived attributes
+            # ensure these are added to the df and list of expected columns
             if not starting_cols:
-                starting_cols = [col for col in ["Sample #","Ct N gene","Test date","Sample ID","bioproject_accession","Primer Scheme"] if col in seq_report_df.columns]
-                biosample_df = seq_report_df[starting_cols].rename(columns={"Test date":"collection_date","Sample #":"sample_name","Sample ID":"sample_title","Ct N gene":"sars_cov_2_diag_pcr_ct_value_1"})
+                starting_cols = [col for col in ["Sample #","Test date","Sample ID","bioproject_accession","Primer Scheme"] if col in seq_report_df.columns]
+                renamed_cols = {"Test date":"collection_date","Sample #":"sample_name","Sample ID":"sample_title"}
+                ct_cols = []
+                # ct_values = {}
+                print("starting_cols:",starting_cols)
+                for i,col in self.sars_cov_2_diag_pcr_ct_values.items():
+                    pcr_ct_col_name = f'sars_cov_2_diag_pcr_ct_value_{i}'
+                    # set col to be included in starting columns
+                    starting_cols.append(col)
+                    # set col to be renamed
+                    renamed_cols[col] = pcr_ct_col_name
+                    # set new col to be added
+                    # ct_values[pcr_ct_col_name] = col
+                    ct_cols.extend([pcr_ct_col_name,f'sars_cov_2_diag_gene_name_{i}'])
+                print("starting_cols:",starting_cols)
+                print("renamed_cols:",renamed_cols)
+                biosample_df = seq_report_df[starting_cols].rename(columns=renamed_cols)
+                # for col_name, value in ct_values.items():
+                #     print(col_name,value)
+                #     biosample_df[col_name] = value
+                # exit(1)
             else:
                 biosample_df = seq_report_df
 
-            # add derived attributes
-            # ensure these are added to the df and list of expected columns
-            ct_cols = []
-            for i,col in self.sars_cov_2_diag_pcr_ct_values.items():
-                biosample_df[f'sars_cov_2_diag_pcr_ct_value_{i}'] = seq_report_df[col]
-                ct_cols.extend([f'sars_cov_2_diag_pcr_ct_value_{i}',f'sars_cov_2_diag_gene_name_{i}'])
+
 
             # merge in gisaid accessions
             # biosample["sample_name_short"] = biosample['sample_name'].astype(str).apply(lambda x: x.split("-")[-1])
@@ -409,8 +427,11 @@ class NCBI:
         # search report*.xml files for one containing BioSample accessions
         else:
             accessions = {}
+            if not self.report_dir:
+                # this catches any plates that don't yet have a report_dir (self.report_dir=="")
+                pass
             # verify reports exist
-            if not Path(self.report_dir).exists():
+            elif not Path(self.report_dir).exists():
                 if require_biosample:
                     raise FileNotFoundError(f"BioSample report directory not found:\n{self.report_dir}")
             else:
@@ -639,14 +660,14 @@ class NCBI:
             df["filename"] = df["sample_name"].apply(self._get_fastq_file)
         return df
 
-    def _prep_sra_df(self):
+    def _prep_sra_df(self,use_existing=False):
         """Returns DataFrame of SRA attributes derived from BioSample data or retrieved from `config_file`"""
 
         # act as a getter, if exists
         if type(self.sra["df"])==pd.DataFrame:
             return self.sra["df"]
         # create new df
-        if self.use_existing:
+        if use_existing or self.use_existing:
             logging.warning("Reading in sra df - not creating it fresh")
             sra_df = pd.read_csv(self.sra["tsv"],sep="\t")
         else:
@@ -995,7 +1016,7 @@ class NCBI:
         """Raises ValueError if `db` is invalid"""
 
         if db not in self.valid_dbs + [None]:
-            raise ValueError(f"The `db` {db} is invalid. Acceptable `db` values: {self.valid_dbs}")
+            raise ValueError(f"The `db` '{db}' is invalid. Acceptable `db` values: {self.valid_dbs}")
 
     def ncbi_interact(self,action,db=None,attempt_num=1,simple=False):
         """Submits files depending on desired `db`
@@ -1065,7 +1086,7 @@ class NCBI:
         if Path != type(file) == str : file = Path(file)
         else: raise Exception(f"Unexpected file type for {file}: {type(file)}")
         if not file.exists():
-            raise FileNotFoundError(f"Can't upload non-existent file: {file}")
+            raise FileNotFoundError(f"Can't upload non-existent file: {file}. Have you run `file_prep` yet?")
         # if expected file exists with expected size, don't upload
         outfile = "submission.xml" if file.name.endswith(".xml") else file.name
         # allow small (non-fastqs (xmls)) to be updated whether size changed or not (but don't re-upload fastqs)
@@ -1093,7 +1114,7 @@ class NCBI:
         logging.info("File sizes at NCBI:")
         for name,details in mlsd_size:
             # write details to stdout
-            logging.info(name,details,"size" in details.keys())
+            logging.info(f"{name}\t{details}\t{'size' in details.keys()}")
             # Only keep files that have size info available
             if "size" in details.keys():
                 self.ftp_file_sizes[name]=details["size"]
@@ -1131,7 +1152,7 @@ class NCBI:
         logging.info(f"\nCWD = subdir: {self.ftp.pwd()}\n")
 
         # move to directory of files to upload
-        logging.info("Moving to local dir:",self.outdir)
+        logging.info(f"Moving to local dir: {self.outdir}")
         self.enterLocalDir(self.outdir)
         logging.info("Current local files:")
         logging.info(os.listdir())
@@ -1153,7 +1174,7 @@ class NCBI:
             # move to directory containing fastqs files to upload
             os.chdir(self.fastq_dir)
             # find and upload all (fastq) files in any column labeled "filename*"
-            sra_df = self._prep_sra_df()
+            sra_df = self._prep_sra_df(use_existing=True)
 
             fn_cols = [col for col in sra_df.columns if col.startswith("filename")]
             for i,row in sra_df.iterrows():

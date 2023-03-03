@@ -3,11 +3,13 @@ Submitting data to public databases is super important for publically funded lab
 
 ***
 ## Installation:
-To install from PyPI:
+To install from PyPI in a virtual environment `.venv`:
 ```console
+python3 -m venv .venv
+. .venv/bin/activate
 pip install ncbi-submit
 ```
-To install from conda (not yet set up):
+To install from conda (not yet set up) in a new environment `ncbi`:
 ```console
 conda create -n ncbi ncbi-submit
 ```

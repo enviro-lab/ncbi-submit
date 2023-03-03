@@ -1,18 +1,20 @@
 #!/usr/bin/env python3
 """A main class for preparing data and interacting with ncbi.
 """
-
+#Git Push test. 
 from ncbi_submit.ncbi import NCBI
 from ncbi_submit.arguments import add_arguments
+from ncbi_submit.helpers import remove_empty_file
 import argparse, logging
-
 
 def parse_args():
     p = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
     add_arguments(p)
     args = p.parse_args()
     # set logging level, if needed
-    logging.basicConfig(filename='ncbi-submit.log', encoding='utf-8', level=getattr(logging,args.log,None))
+    setattr(args,"logfile",args.outdir/'ncbi-submit.log')
+    args.logfile.parent.mkdir(exist_ok=True,parents=True)
+    logging.basicConfig(filename=args.logfile, encoding='utf-8', level=getattr(logging,args.log,None))
     return args
 
 def main():
@@ -57,9 +59,9 @@ def main():
         if args.check:
             print(f"Checking {args.db}")
             ncbi.check(db=args.db,attempt_num=args.attempt_num,simple=args.simple)
-
             
-
+    # remove logfile if not used
+    remove_empty_file(args.logfile)
 
 if __name__ == "__main__":
     main()

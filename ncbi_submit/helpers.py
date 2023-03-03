@@ -152,3 +152,20 @@ def asDate(some_date):
     
     y,mo,d,h,m,s = some_date[:4],some_date[4:6],some_date[6:8],some_date[8:10],some_date[10:12],some_date[12:14]
     return f"{y}-{mo}-{d} {h}:{m}:{s}"
+
+def remove_empty_file(file):
+    """Removes `file` if empty"""
+
+    file = Path(file)
+    if not file.exists(): return
+    lines = file.open('r').readlines()
+    if len(lines) == 0:
+        file.unlink()
+        return
+    if len(lines) > 1: return
+    else:
+        line = lines[0]
+        if len(line) > 1:
+            return
+        if line == "\n" or not line:
+            file.unlink()
