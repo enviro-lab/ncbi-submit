@@ -169,3 +169,18 @@ def remove_empty_file(file):
             return
         if line == "\n" or not line:
             file.unlink()
+
+def ensure_outdir_viable(outdir):
+    """Ensures outdir isn't a file and makes the directory, if needed
+    
+    Returns:
+        Path(outdir)
+    """
+
+    if not type(outdir) == Path:
+        outdir = Path(outdir).resolve()
+    if outdir.is_dir(): pass
+    elif not outdir.exists():
+        outdir.mkdir(exist_ok=True,parents=False)
+    return outdir
+

@@ -105,9 +105,10 @@ setup(
     author_email=EMAIL,
     python_requires=REQUIRES_PYTHON,
     url=URL,
+    packages=find_packages(exclude=["ncbi_submit", "example"]),
     # packages=find_packages(exclude=["tests", "*.tests", "*.tests.*", "tests.*"]),
     # If your package is a single module, use this instead of 'packages':
-    py_modules=["ncbi_submit","example"],
+    # py_modules=['ncbi_submit'],
 
     # entry_points={
     #     'console_scripts': ['mycli=mymodule:cli'],

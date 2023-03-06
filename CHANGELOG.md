@@ -1,5 +1,10 @@
 # Change Log
 
+## v0.4.1
+### Changed
+* `./example` dir is actually included, now
+* 
+
 ## v0.4.0
 ### Added
 * Made config.py/template.sbt accessible
