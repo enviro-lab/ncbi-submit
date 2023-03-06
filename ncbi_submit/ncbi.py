@@ -127,7 +127,7 @@ class NCBI:
     def _set_outdir(self,outdir):
         """Insures "test" is in `outdir` basename, if using `test_dir` flag"""
 
-        outdir = Path(outdir)
+        outdir = ensure_outdir_viable(outdir)
         if self.test_dir and "test" not in outdir.name:
             outdir = outdir.parent / f"{outdir.name}_test"
             print(f"Resetting outdir --> {outdir}")

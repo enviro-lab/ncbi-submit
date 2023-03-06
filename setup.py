@@ -107,7 +107,7 @@ setup(
     url=URL,
     # packages=find_packages(exclude=["tests", "*.tests", "*.tests.*", "tests.*"]),
     # If your package is a single module, use this instead of 'packages':
-    py_modules=['ncbi_submit'],
+    py_modules=["ncbi_submit","example"],
 
     # entry_points={
     #     'console_scripts': ['mycli=mymodule:cli'],

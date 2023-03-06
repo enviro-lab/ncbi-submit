@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ncbi-submit"
-version = "0.3.2"
+version = "0.4.0"
 description = "A tool for submitting to NCBI (SRA, BioSample, & GenBank)."
 license = "MIT"
 authors = [
@@ -14,6 +14,9 @@ keywords = ["ncbi", "submission","upload"]
 readme = "README.md"
 packages = [
     { include = "ncbi_submit" },
+]
+include = [
+    { path = "example", format = "sdist" }
 ]
 
 [tool.poetry.dependencies]

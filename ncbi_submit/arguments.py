@@ -93,6 +93,12 @@ def add_ftp_args(parser_ftp):
     # parser_ftp.add_argument("--gisaid_log",required=True,type=Path,
     #     help="Path to submission log from gisaid upload - used to weed out unwanted seqs from `--fasta`")
 
+def add_example_args(parser_example:argparse.ArgumentParser):
+    # submit
+    parser_example.add_argument("--config",action="store_true",help="Only write the example config file")
+    parser_example.add_argument("--template",action="store_true",help="Only write the example template file")
+    parser_example.add_argument("--outdir",required=False,type=Path,help="Path to output directory (default = ./ncbi)",default=Path("ncbi"))
+
 # def add_biosample_args(parser_biosample):
 #     ## add_biosample
 #     parser_biosample.add_argument("--outdir",type=Path,default=Path("ncbi"),required=True,
@@ -131,15 +137,15 @@ def add_arguments(parser:argparse.ArgumentParser):
     subparsers = parser.add_subparsers(
         help="Prepare NCBI submission TSVs or submit to NCBI using one of these actions",dest="action")
     parser_file_prep = subparsers.add_parser("file_prep",formatter_class=argparse.RawTextHelpFormatter,
-        help=textwrap.dedent(
-        "Create NCBI-style submission TSVs by combining \
-        \n  sequencing report metadata, primer scheme info, and EpiCov accessions. \
-        \nOutputs include: \
-        \n    'biosample_attributes.tsv'\
-        \n    'sra-metadata.tsv'\
-        \n    'genbank-metadata.tsv'\
-        \n    'merged-metadata.tsv' - combination of fields in above files\
-        \n"))
+        help=textwrap.dedent("""\
+        Create NCBI-style submission TSVs by combining 
+          sequencing report metadata, primer scheme info, and EpiCov accessions. 
+        Outputs include: 
+            'biosample_attributes.tsv'
+            'sra-metadata.tsv'
+            'genbank-metadata.tsv'
+            'merged-metadata.tsv' - combination of fields in above files
+        """))
     
     parser_ftp = subparsers.add_parser("ftp",formatter_class=argparse.RawTextHelpFormatter,
         help=textwrap.dedent(
@@ -156,11 +162,18 @@ def add_arguments(parser:argparse.ArgumentParser):
         `--check`: Downloads report.xml and reports on submission status. Checks all databases if `--db` not specified.
         """))
     
+    parser_example = subparsers.add_parser("example",formatter_class=argparse.RawTextHelpFormatter,
+        help=textwrap.dedent(
+        """\
+        Get templates for "config.py" and/or "template.sbt" to a specified `outdir`
+        """))
+    
     # parser_biosample =  subparsers.add_parser("add_biosample",
     #     help="Add BioSample accessions to the previously created 'genbank-metadata.tsv'")
     
     add_file_prep_args(parser_file_prep)
     add_ftp_args(parser_ftp)
+    add_example_args(parser_example)
     # add_biosample_args(parser_biosample)
 
     return parser
