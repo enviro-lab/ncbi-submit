@@ -1,5 +1,9 @@
 # Change Log
 
+## Unreleased
+### Changed
+* Readme reflects new behavior
+
 ## v0.4.1
 ### Changed
 * `./example` dir is actually included, now

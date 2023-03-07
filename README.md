@@ -42,9 +42,18 @@ There are three main actions the script can do:
   * Interacts with NCBI's ftp host to do either of the following:
     * `submit` data to NCBI databases 
     * `check` on previous ftp submissions
+* `example`:
+  * Writes out example files for one or both of:
+    * config.py file (tells ncbi_submit lots of important info)
+    * template.sbt (used for genbank submission)
 
 ### Setup
-The required parameters vary by which of the above actions you're attempting but at minimum require a `plate` and `outdir`. To limit the number of parameters required via command line, a `config` file must be used When running from the command line, one of the three actions (`file_prep` or `ftp`) must be specified. With python, these are associated methods you may use on a single NCBI object.
+The required parameters vary by which of the above actions you're attempting but at minimum require a `plate` and `outdir`. To limit the number of parameters required via command line, a `config` file must be used. When running from the command line, one of the three actions (`file_prep` or `ftp`) must be specified. With python, these are associated methods you may use on a single NCBI object.
+
+#### Get example `config.py` file:
+```console
+ncbi_setup example --config --outdir "nbci"
+```
 
 #### Python instantiation (not needed on command line):
 Note: This is the minimum required info for preparing data. Other parameters may be necessary for more functionality or other tasks.  
