@@ -2,12 +2,18 @@
 
 ## Unreleased
 ### Changed
+* Readme fixed
+
+## v0.4.1
+### Changed
 * Readme reflects new behavior
+* Readme improved
+* improved setup.py
+* fixed a helper function
 
 ## v0.4.1
 ### Changed
 * `./example` dir is actually included, now
-* 
 
 ## v0.4.0
 ### Added
