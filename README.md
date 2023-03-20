@@ -29,7 +29,7 @@ This script ^^^ could also be a good starting point for your own NCBI submission
 ***
 ## Usage
 
-`ncbi_interact.py` is intended for use on the command line, but the class `ncbi.NCBI` can be imported and used within custom python scripts.
+`ncbi_interact.py` is intended for use on the command line, but the class `ncbi.NCBI` can be imported and used within custom python scripts. If the package is pip installed, it can be run via the command `ncbi_submit`.
 
 There are three main actions the script can do:
 * `file_prep`: 
@@ -44,7 +44,7 @@ There are three main actions the script can do:
     * `check` on previous ftp submissions
 * `example`:
   * Writes out example files for one or both of:
-    * config.py file (tells ncbi_submit lots of important info)
+    * config.py file (tells `ncbi_submit` lots of important info)
     * template.sbt (used for genbank submission)
 
 ### Setup
@@ -52,14 +52,14 @@ The required parameters vary by which of the above actions you're attempting but
 
 #### Get example `config.py` file:
 ```console
-ncbi_setup example --config --outdir "nbci"
+ncbi_submit example --config --outdir "nbci"
 ```
 
 #### Python instantiation (not needed on command line):
 Note: This is the minimum required info for preparing data. Other parameters may be necessary for more functionality or other tasks.  
 ```python
-from modules.ncbi import NCBI
-ncbi = NCBI(
+from ncbi_submit import ncbi_submit
+ncbi = ncbi_submit.NCBI(
     fastq_dir = myFastqDir,
     seq_report = mySeqReport,
     plate = myPlate,
@@ -72,7 +72,7 @@ ncbi.write_presubmission_metadata()
 ### File Preperation
 #### Shell:
 ```console
-python ncbi_interact.py file_prep \
+ncbi_submit file_prep \
     --test_mode --test_dir \
     --config "${NCBI_CONFIG}" \
     --seq_report "${SEQ_REPORT}" \
@@ -91,7 +91,7 @@ ncbi.write_presubmission_metadata()
 ### File Submission
 #### Shell:
 ```console
-python ncbi_interact.py ftp \
+ncbi_submit ftp \
     --submit --db bs_sra \
     --test_mode --test_dir \
     --config "${NCBI_CONFIG}" \
@@ -118,7 +118,7 @@ To link your fasta in GenBank to the associated reads, you'll want to add in the
 #### Shell:
 ```console
 # dowload report.xml files to get accesssions from
-python ncbi_interact.py ftp \
+ncbi_submit ftp \
     --check --db ${DB} \
     --outdir "${NCBI_DIR}" \
     --config "${NCBI_CONFIG}" \
@@ -128,14 +128,14 @@ python ncbi_interact.py ftp \
     --fastq_dir "${FASTQS}"
 
 # add accessions to genbank.tsv
-python ncbi_interact.py --prep_genbank \
+ncbi_submit --prep_genbank \
     --outdir "${NCBI_DIR}" \
     --config ${NCBI_CONFIG} \
     --fasta "${GENERIC_CONSENSUS//PLATE/$PLATE}" \
     --plate "${PLATE}"
 
 # submit to GenBank (NOTE: db='gb')
-python ncbi_interact.py ftp \
+ncbi_submit ftp \
     --submit --db gb \
     --test_mode --test_dir \
     --config "${NCBI_CONFIG}" \
@@ -162,7 +162,7 @@ This works for whichever db you want to check on. If not specified, you'll get r
 #### Shell:
 ```console
 # check GenBank submission (NOTE: db='gb')
-python ncbi_interact.py ftp \
+ncbi_submit ftp \
     --check --db gb \
     --test_mode --test_dir \
     --config "${NCBI_CONFIG}" \

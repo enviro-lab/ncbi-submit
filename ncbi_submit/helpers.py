@@ -170,7 +170,7 @@ def remove_empty_file(file):
         if line == "\n" or not line:
             file.unlink()
 
-def ensure_outdir_viable(outdir):
+def ensure_outdir_viable(outdir:Path):
     """Ensures outdir isn't a file and makes the directory, if needed
     
     Returns:
@@ -179,8 +179,8 @@ def ensure_outdir_viable(outdir):
 
     if not type(outdir) == Path:
         outdir = Path(outdir).resolve()
-    if outdir.is_dir(): pass
-    elif not outdir.exists():
+    if outdir.is_dir(): return outdir
+    if not outdir.exists():
         outdir.mkdir(exist_ok=True,parents=False)
-    return outdir
-
+        return outdir
+    if outdir.is_file(): raise FileExistsError(f"Proposed `outdir` ({outdir}) already exists as a file.")
