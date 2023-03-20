@@ -122,7 +122,7 @@ Then run `ncbi_submit ftp --submit` to submit to GenBank
 #### Shell:
 ```console
 # dowload report.xml files to get accesssions and add them to genbank.tsv
-ncbi_submit --prep_genbank \
+ncbi_submit file_prep --prep_genbank \
     -u "${ncbi_username}" \
     -p "${ncbi_password}" \
     --outdir "${NCBI_DIR}" \
