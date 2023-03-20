@@ -1,11 +1,18 @@
 # Change Log
 
-## Unreleased
+## Unreleased v0.4.4
+### Changed
+* fixed check for excludables
+* fixed filling na as bioproject
+* minor printout adjustments
+* minor cleanup
+
+## v0.4.3
 ### Changed
 * fixed readme
 * fixed missing text with unimplemented `_offer_skip_option`
 
-## v0.4.1
+## v0.4.2
 ### Changed
 * Readme reflects new behavior
 * Readme improved

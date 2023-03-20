@@ -87,7 +87,7 @@ def df_2_tsv(df,outfile,name=None):
     """
 
     if name:
-        print(f"Writing `{name}` outfile:",outfile)
+        print(f"Writing `{name}` tsv:",outfile)
     outdir = Path(outfile).parent
     outdir.mkdir(parents=True,exist_ok=True)
     df.to_csv(outfile, index=False, sep="\t")

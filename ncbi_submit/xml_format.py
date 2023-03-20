@@ -127,6 +127,7 @@ class SRA_Action(SRA_BioSample_Action):
 
     def generate_file_info(self):
         """Yields xml text for adding fastq files to an SRA sample"""
+
         for key,val in self.attributes.items():
             if key.startswith("filename"):
                 if str(val) == "nan":
@@ -425,4 +426,3 @@ class SRA_BioSample_Submission(Submission):
           </AddData>
         </Action>"""
         ),"    ")
-

@@ -36,7 +36,7 @@ class NCBI:
         self.contact = cf["contact"]
         self.email = cf["email"]
         self.phone = cf["phone"] # not used (but could be for template generation)
-        self.controls = controls or cf.get("controls")
+        self.controls = controls or cf.get("controls","")
         self.ncbiCountry = cf["ncbiCountry"]
         self.affiliation = cf["affiliation"]
         self.authors = cf["authors"]
@@ -172,7 +172,8 @@ class NCBI:
                 seq_report_df = seq_report_df.rename(columns={"Seq ID":"Sample #"})
             # weed out controls
             if "Sample #" in seq_report_df.columns:
-                seq_report_df = seq_report_df[seq_report_df["Sample #"].str.contains(self.controls)==False]
+                if self.controls > "":
+                    seq_report_df = seq_report_df[~seq_report_df["Sample #"].str.contains(self.controls)]
             if "Test date" in seq_report_df.columns:
                 seq_report_df["Test date"] = pd.DatetimeIndex(seq_report_df['Test date']).strftime('%Y-%m-%d')
             if 'Sample ID' in seq_report_df.columns:
@@ -186,8 +187,8 @@ class NCBI:
         if self.barcode_map == None:
             return pd.DataFrame()
         bc = pd.read_csv(self.barcode_map,sep="\t",names=["barcode","sample_name"])
-        if self.controls and type(self.controls)==str:
-            bc = bc[bc["sample_name"].str.contains(self.controls)==False]
+        if self.controls > "":
+            bc = bc[~bc["sample_name"].str.contains(self.controls)]
         return bc
 
     def _prep_gisaid_df(self):
@@ -256,7 +257,7 @@ class NCBI:
             if not "bioproject_accession" in df.columns:
                 df["bioproject_accession"] = default_production_accession
             else:
-                df = df.fillna(default_production_accession)
+                df["bioproject_accession"] = df["bioproject_accession"].fillna(default_production_accession)
                 # ensure all accessions look like accessions
                 checkBioProjectAccessions(df["bioproject_accession"])
         return df
@@ -285,7 +286,6 @@ class NCBI:
                 starting_cols = [col for col in ["Sample #","Test date","Sample ID","bioproject_accession","Primer Scheme"] if col in seq_report_df.columns]
                 renamed_cols = {"Test date":"collection_date","Sample #":"sample_name","Sample ID":"sample_title"}
                 ct_cols = []
-                # ct_values = {}
                 print("starting_cols:",starting_cols)
                 for i,col in self.sars_cov_2_diag_pcr_ct_values.items():
                     pcr_ct_col_name = f'sars_cov_2_diag_pcr_ct_value_{i}'
@@ -294,23 +294,14 @@ class NCBI:
                     # set col to be renamed
                     renamed_cols[col] = pcr_ct_col_name
                     # set new col to be added
-                    # ct_values[pcr_ct_col_name] = col
                     ct_cols.extend([pcr_ct_col_name,f'sars_cov_2_diag_gene_name_{i}'])
                 print("starting_cols:",starting_cols)
                 print("renamed_cols:",renamed_cols)
                 biosample_df = seq_report_df[starting_cols].rename(columns=renamed_cols)
-                # for col_name, value in ct_values.items():
-                #     print(col_name,value)
-                #     biosample_df[col_name] = value
-                # exit(1)
             else:
                 biosample_df = seq_report_df
 
-
-
             # merge in gisaid accessions
-            # biosample["sample_name_short"] = biosample['sample_name'].astype(str).apply(lambda x: x.split("-")[-1])
-            # biosample = pd.merge(biosample,gisaid,on="sample_name_short",how='outer')
             if not self.gisaid_df.empty:
                 # biosample = pd.merge(biosample,gisaid,on="sample_name_short",how='right')
                 biosample_df = pd.merge(biosample_df,self.gisaid_df,on="sample_name",how='right')
@@ -326,7 +317,7 @@ class NCBI:
 
             # add config defaults/overrides
             for k,col in self.biosample_presets.items():
-                if not k in ("bioproject_accession","bioproject_test_accession"):
+                if not k in ("bioproject_accession","bioproject_test_accession","all_cols"):
                     biosample_df[k] = col
 
             # use test bioproject for all samples (if --test_dir==True)
@@ -342,7 +333,7 @@ class NCBI:
                 required_bs_attr = ["sample_name","organism","collected_by","collection_date","geo_loc_name","isolation_source"]
             else: # This assumes the user hasn't forgotten any necessary columns. NCBI submission will fail if important attributes are missing, anyway...
                 required_bs_attr = []
-            all_bs_cols = [x.strip() for x in self.biosample_presets.get("all_cols","").split(",") if x]
+            all_bs_cols = [x.strip() for x in self.biosample_presets.get("all_cols","").split(",") if x and not x=="all_cols"]
             if not all_bs_cols:
                 all_bs_cols = ['sample_name','sample_title','bioproject_accession','organism','collected_by','collection_date','geo_loc_name','host','host_disease','isolate','isolation_source','antiviral_treatment_agent','collection_device','collection_method','date_of_prior_antiviral_treat','date_of_prior_sars_cov_2_infection','date_of_sars_cov_2_vaccination','exposure_event','geo_loc_exposure','gisaid_accession','gisaid_virus_name','host_age','host_anatomical_material','host_anatomical_part','host_body_product','host_disease_outcome','host_health_state','host_recent_travel_loc','host_recent_travel_return_date','host_sex','host_specimen_voucher','host_subject_id','lat_lon','passage_method','passage_number','prior_sars_cov_2_antiviral_treat','prior_sars_cov_2_infection','prior_sars_cov_2_vaccination','purpose_of_sampling','purpose_of_sequencing']
                 all_bs_cols.extend(ct_cols)
@@ -359,10 +350,15 @@ class NCBI:
             # ensure length of biosample matches length of barcodes available (excluding controls)
             if not self.barcode_df.empty:
                 barcode_df_filtered = self.barcode_df[~self.barcode_df['sample_name'].isin(self._findExcludables())]
-                extras = set(barcode_df_filtered["sample_name"].unique()) - set(biosample_df["sample_name"].unique())
-                if len(extras) > 0:
+                bc_extras = set(barcode_df_filtered["sample_name"].unique()) - set(biosample_df["sample_name"].unique())
+                if len(bc_extras) > 0:
                     print("\nWARNING:\nSamples exist in barcode file that are not found in BioSample file.")
-                    print(self._offer_skip_option(extras))
+                    print(self._offer_skip_option(bc_extras))
+                    warn("")
+                bs_extras = set(biosample_df["sample_name"].unique()) - set(barcode_df_filtered["sample_name"].unique())
+                if len(bs_extras) > 0:
+                    print("\nWARNING:\nSamples exist in BioSample file that are not found in barcode file.")
+                    print(self._offer_skip_option(bs_extras))
                     warn("")
             # ensure all samples present have not been previously submitted
             self._ensure_new_names_only(biosample_df)
@@ -493,6 +489,13 @@ class NCBI:
         else:
             cols = ['sample_name','organism','geo_loc_name', 'host', 'isolate', 'collection_date', 'isolation_source', 'bioproject_accession', 'gisaid_accession']
             if ignore_dates: cols = remove_item('collection_date',cols)
+            # environmental isolates should not include the 'host' column
+            if self.biosample_presets['isolation_source'] in ("Clinical",):
+                pass
+            elif self.biosample_presets['isolation_source'] in ("Wastewater",):
+                cols = remove_item('host',cols)
+            else:
+                raise NotImplementedError(f"Unsure whether 'host' should be in `cols` or not with isolation source '{self.biosample_presets['isolation_source']}'.")
             genbank_df: pd.DataFrame = self.biosample["df"].copy()[cols]
             genbank_df['biosample_accession'] = 'Missing'
             genbank_df['gisaid_accession'] = genbank_df['gisaid_accession'].apply(lambda x: 'GISAID accession: ' + str(x).strip() if str(x)!='missing' else "")
@@ -658,7 +661,9 @@ class NCBI:
             if "Primer Scheme" in sra_df.columns:
                 cols.append("Primer Scheme")
             sra_df = sra_df[cols]
-            sra_df = sra_df[~sra_df['sample_name'].isin(self.controls.split("|"))] # weed out controls - we don't want to submit those
+            # sra_df = sra_df[~sra_df['sample_name'].isin(self.controls.split("|"))] # weed out controls - we don't want to submit those
+            if self.controls > "":
+                sra_df = sra_df[~sra_df['sample_name'].str.contains(self.controls)] # weed out controls - we don't want to submit those
             submittable = self.get_gisaid_submitted_samples()
             if not self.barcode_df.empty:
                 sra_df = sra_df.merge(self.barcode_df,on='sample_name',how="outer")
@@ -689,7 +694,6 @@ class NCBI:
         required_sra_cols = ["bioproject_accession","sample_name","library_ID","title","library_strategy","library_source","library_selection","library_layout","platform","instrument_model","design_description","filetype","filename"]
         all_sra_cols = ['bioproject_accession','sample_name','library_ID','title','library_strategy','library_source','library_selection','library_layout','platform','instrument_model','design_description','filetype','filename','filename2','amplicon_PCR_primer_scheme','amplicon_size','sequencing_protocol_name','raw_sequence_data_processing_method','dehosting_method','sequence_submitter_contact_email']
         extra_cols = [col for col in sra_df.keys() if col not in set(all_sra_cols)]
-        all_sra_cols = all_sra_cols
         # actual_cols = [col for col in all_sra_cols+['sample_name_short'] if col in sra.columns] + extra_cols
         actual_cols = [col for col in all_sra_cols if col in sra_df.columns] + extra_cols
 
@@ -927,7 +931,7 @@ class NCBI:
             )
 
         # prepare/write XML
-        print(f'Writing sra/biosample xml:\n   {self.sra["xml_file"]}')
+        print(f'Writing `sra/biosample` xml: {self.sra["xml_file"]}')
         self.write_sra_biosample_xml()
 
     def write_genbank_submission_zip(self,biosample_accessions=None):
@@ -941,9 +945,9 @@ class NCBI:
           * genbank.zip (seqs.sbt, seqs.fsa, seqs.src, [comment.cmt])
         """
 
-        print(f"Writing genbank xml:\n   {self.genbank['xml_file']}")
+        print(f"Writing `genbank` xml: {self.genbank['xml_file']}")
         self.write_genbank_xml()
-        print(f"Writing genbank zip:\n   {self.genbank['zip_file']}")
+        print(f"Writing `genbank` zip: {self.genbank['zip_file']}")
         self.write_genbank_zip(biosample_accessions)
 
 
