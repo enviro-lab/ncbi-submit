@@ -2,7 +2,8 @@
 
 ## Unreleased
 ### Changed
-* Readme fixed
+* fixed readme
+* fixed missing text with unimplemented `_offer_skip_option`
 
 ## v0.4.1
 ### Changed

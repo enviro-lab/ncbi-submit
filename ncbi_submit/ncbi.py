@@ -13,19 +13,6 @@ from ncbi_submit.xml_format import SRA_BioSample_Submission,GenBank_Submission
 from zipfile import ZipFile
 from Bio import SeqIO
 
-### TRY to use these as parameters from ncbi_interact (avoid them as attributes)
-# self.sra_only = sra_only
-# self.biosample_accessions = biosample_accessions
-# self.subdir = subdir
-# self.db = db
-# self.test_mode = test_mode
-# self.host = host
-# self.username = username
-# self.password = password
-# self.submit = submit
-# self.check = check
-# self.attempt_num = attempt_num
-
 class NCBI:
     def __init__(self,plate,fastq_dir,seq_report,outdir,barcode_map=None,
                  config=None,controls=None,gisaid_log=None,primer_map=None,
@@ -374,14 +361,8 @@ class NCBI:
                 barcode_df_filtered = self.barcode_df[~self.barcode_df['sample_name'].isin(self._findExcludables())]
                 extras = set(barcode_df_filtered["sample_name"].unique()) - set(biosample_df["sample_name"].unique())
                 if len(extras) > 0:
-                    logging.warning(dedent(f"""
-                        Samples exist in barcode file that aren't found in BioSample file:
-                        \t{extras}
-                        Any sample can be skipped by writing it in a line by itself in a file called:
-                        {self.exclude_file}
-                        If {'these samples' if len(extras)!=1 else 'this sample'} should be excluded from submissions, you can use this command:"""))
-                    for sample in extras:
-                        print(f"echo '{sample}' >> '{self.exclude_file}'")
+                    print("\nWARNING:\nSamples exist in barcode file that are not found in BioSample file.")
+                    print(self._offer_skip_option(extras))
                     warn("")
             # ensure all samples present have not been previously submitted
             self._ensure_new_names_only(biosample_df)
@@ -542,7 +523,7 @@ class NCBI:
         """
 
         output = ["Any samples that should not be submitted can be written on a line by themselves in a file called",
-            f"{self.exclude_file}",
+            f"'{self.exclude_file}'.",
             "You can use this command:"]
         for sample_name in samples:
             output += [f'echo "{sample_name}" >> {self.exclude_file}']
@@ -779,7 +760,7 @@ class NCBI:
 
         if len(samples_to_maybe_exclude) != 0:
             logging.warning(warning)
-            self._offer_skip_option(samples_to_maybe_exclude)
+            print(self._offer_skip_option(samples_to_maybe_exclude))
             exit(1)
 
     def getAllowedSamples(self,all_samples=None):
