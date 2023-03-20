@@ -1,5 +1,5 @@
 # ncbi-submit
-Submitting data to public databases is super important for publically funded laboratories, but it is not always a quick or intuitive process. NCBI Interact provides a simple and repeatable way to upload programmatic submissions to NCBI's SRA and GenBank with shared or unique BioProjects and BioSamples. Data can be uploaded as XML or zip files to either the Test or Production environments, and once there, the reports produced by NCBI can be analyzed to check on submission status and get BioSample accessions.
+Submitting data to public databases is super important for publically funded laboratories, but it is not always a quick or intuitive process. `ncbi-submit` provides a simple and repeatable way to upload programmatic submissions to NCBI's SRA and GenBank with shared or unique BioProjects and BioSamples. Data can be uploaded as XML or zip files to either the Test or Production environments, and once there, the reports produced by NCBI can be analyzed to check on submission status and get BioSample accessions.
 
 ***
 ## Installation:
@@ -29,7 +29,7 @@ This script ^^^ could also be a good starting point for your own NCBI submission
 ***
 ## Usage
 
-`ncbi_interact.py` is intended for use on the command line, but the class `ncbi.NCBI` can be imported and used within custom python scripts. If the package is pip installed, it can be run via the command `ncbi_submit`.
+`ncbi_submit.py` is intended for use on the command line, but the class `ncbi.NCBI` can be imported and used within custom python scripts. If the package is pip installed, it can be run via the command `ncbi_submit`.
 
 There are three main actions the script can do:
 * `file_prep`: 
@@ -109,26 +109,22 @@ ncbi.check(db="bs_sra)
 
 ### GenBank submission
 (NOTE: not fully tested)
-To link your fasta in GenBank to the associated reads, you'll want to add in the BioSample accessions before submitting. Follow these steps.
+To link your fasta in GenBank to the associated reads, you'll want to add in the BioSample accessions before submitting.
 * Acquire BioSample accessions via one of these methods:
-  * download accessions.tsv file from NCBI
+  * download accessions.tsv file from NCBI and then use `ncbi_submit`
     * (Do this if you submitted to BioSample via NCBI's Submission Portal)
-  * use ncbi_interact.py
+  * use `ncbi_submit --prep_genbank`.
     * (Do this to avoid manual uploads  via NCBI's Submission Portal)
+    * if you submitted to BioSample via `ncbi_submit`, it can retrieve accessions automatically
+
+Then run `ncbi_submit ftp --submit` to submit to GenBank
+
 #### Shell:
 ```console
-# dowload report.xml files to get accesssions from
-ncbi_submit ftp \
-    --check --db ${DB} \
-    --outdir "${NCBI_DIR}" \
-    --config "${NCBI_CONFIG}" \
+# dowload report.xml files to get accesssions and add them to genbank.tsv
+ncbi_submit --prep_genbank \
     -u "${ncbi_username}" \
     -p "${ncbi_password}" \
-    --plate "${PLATE}" \
-    --fastq_dir "${FASTQS}"
-
-# add accessions to genbank.tsv
-ncbi_submit --prep_genbank \
     --outdir "${NCBI_DIR}" \
     --config ${NCBI_CONFIG} \
     --fasta "${GENERIC_CONSENSUS//PLATE/$PLATE}" \
@@ -146,10 +142,13 @@ ncbi_submit ftp \
 ```
 #### Python:
 ```python
-# dowload report.xml files to get accesssions from
-ncbi.check(db="bs_sra)
+# dowload report.xml files to get accesssions
+ncbi.check(db="bs_sra")
 # prepare genbank submission files and submit
 ncbi.submit(db="gb")
+
+## or
+
 # files can also be prepared without submitting via:
 ncbi.write_genbank_submission_zip()
 ```
