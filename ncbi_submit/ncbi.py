@@ -5,6 +5,7 @@
 from ftplib import FTP
 from io import StringIO
 import os, logging
+from pathlib import Path
 from textwrap import dedent
 import pandas as pd
 from ncbi_submit.helpers import *
@@ -542,7 +543,7 @@ class NCBI:
             FileNotFoundError: if single fastq file not found for `sample_name`
         """
 
-        possible_files = list(self.fastq_dir.glob(f"*{sample_name}*.fastq"))
+        possible_files = list(self.fastq_dir.glob(f"*{sample_name}*.fastq*"))
         if len(possible_files) == 1:
             file_path:Path = possible_files[0]
         elif len(possible_files) > 1:
@@ -567,17 +568,17 @@ class NCBI:
 
         possible_files:list[Path] = list(self.fastq_dir.glob(f"*{sample_name}*"))
         if len(possible_files) == 2:
-            if possible_files[0].name.endswith("fastq") and possible_files[1].name.endswith("fastq"):
+            if is_fastq(possible_files[0]) and is_fastq(possible_files[1]):
                 return possible_files
         elif len(possible_files) == 0:
             raise FileNotFoundError(f"Can't locate fastqs in {self.fastq_dir} via sample name '{sample_name}'.\n{self._offer_skip_option(sample_name)}")
         elif len(possible_files) == 1:
-            if possible_files[0].name.endswith("fastq"):
+            if is_fastq(possible_files[0]):
                 raise FileNotFoundError(f"Expected directory containing paired fastq files but found single fastq:\n\t'{possible_files[0]}'")
             poss_directory = possible_files[0]
             possible_files = list(poss_directory.glob("*.fastq"))
             if len(possible_files) == 2:
-                if possible_files[0].name.endswith("fastq") and possible_files[1].name.endswith("fastq"):
+                if is_fastq(possible_files[0]) and is_fastq(possible_files[1]):
                     return possible_files
             else:
                 raise FileNotFoundError(f"Can't locate any paired '*.fastq' files in {poss_directory}")

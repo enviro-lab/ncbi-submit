@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ncbi-submit"
-version = "0.4.4"
+version = "0.4.5"
 description = "A tool for submitting to NCBI (SRA, BioSample, & GenBank)."
 license = "MIT"
 authors = [

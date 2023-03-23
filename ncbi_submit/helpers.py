@@ -2,10 +2,12 @@
 """A set up useful tools/functions that aren't specific to the other classes
 """
 
+from functools import partial
+import gzip
 import pandas as pd
 from pathlib import Path
 import io
-from Bio import SeqIO
+from Bio.SeqIO.QualityIO import FastqGeneralIterator
 
 main_dir = list(Path(__file__).resolve().parents)[1]
 
@@ -184,3 +186,20 @@ def ensure_outdir_viable(outdir:Path):
         outdir.mkdir(exist_ok=True,parents=False)
         return outdir
     if outdir.is_file(): raise FileExistsError(f"Proposed `outdir` ({outdir}) already exists as a file.")
+
+def is_fastq(file):
+    """Returns True if file is fastq or fastq.gz else False
+
+    Args:
+        file (str|Path): filename to check
+    """
+
+    file = Path(file)
+    if "fastq" not in file.suffixes:
+        return False
+    _open = partial(gzip.open,mode="rt") if file.suffix == "gz" else open
+    with _open(file) as fh:
+        for title, seq, qual in FastqGeneralIterator(fh):
+            if title and seq and qual:
+                return True
+            else: return False

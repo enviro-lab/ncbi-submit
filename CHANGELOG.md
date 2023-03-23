@@ -1,6 +1,10 @@
 # Change Log
 
-## Unreleased v0.4.4
+## v0.4.5
+### Changed
+* fastq.gz files are allowed (instead of just fastq files)
+
+## v0.4.4
 ### Changed
 * fixed check for excludables
 * fixed filling na as bioproject
