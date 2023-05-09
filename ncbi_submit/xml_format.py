@@ -3,9 +3,7 @@
 
 import datetime
 from abc import ABC, abstractmethod
-from pathlib import Path
 from textwrap import indent,dedent
-import pandas as pd
 from ncbi_submit.helpers import series2dict,get_bioproject_spuid
 # from ncbi_submit.ncbi import NCBI # only use for testing (with typing hints) - otherwise causes circular import
 

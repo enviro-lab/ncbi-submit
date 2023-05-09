@@ -6,7 +6,6 @@ from ftplib import FTP
 from io import StringIO
 import os, logging
 from pathlib import Path
-from textwrap import dedent
 import pandas as pd
 from ncbi_submit.helpers import *
 from ncbi_submit.report import Report
@@ -55,6 +54,12 @@ class NCBI:
         self.test_mode = test_mode if test_mode==True else cf.get("test_mode",test_mode)
         self.use_existing = use_existing
         self.vary_spuid = vary_spuid
+
+        # varify files exist if provided
+        for name,path in {"fastq_dir":fastq_dir,"seq_report":seq_report,"barcode_map":barcode_map,"gisaid_log":gisaid_log,"primer_map":primer_map,"fasta":fasta}.items():
+            if path and not Path(path).exists():
+                print(f"The provided file does not exist:\n{name}: {path}")
+                warn("")
 
         # set plate-specific details
         self.fastq_dir = Path(fastq_dir) if fastq_dir else None
@@ -219,7 +224,7 @@ class NCBI:
         submitted = pd.read_csv(self.submitted_samples_file,header=None,names=["already_submitted"])["already_submitted"].unique()
         attempted_duplicate = df[df["sample_name"].isin(submitted)]
         if len(attempted_duplicate) > 0:
-            raise ValueError(f"The following sample(s) appear to have already been submitted.\n\n{attempted_duplicate}\n\n * To submit anyway,  remove that sample name from the file ({self.submitted_samples_file}) or temporarily comment out the variable `submitted_samples` in the `config_file`. \n * To exclude a sample from submission, add it to {self.exclude_file}")
+            raise ValueError(f"The following sample(s) appear to have already been submitted.\n\n{attempted_duplicate}\n\n * To submit anyway, remove any offending sample name from the file '{self.submitted_samples_file}' or temporarily comment out the variable `submitted_samples` in the `config_file`. \n * To exclude a sample from submission, add it to '{self.exclude_file}'")
 
     def _findExcludables(self):
         """Returns list of samples to exclude (if found in file `self.exclude_file`)"""
@@ -287,7 +292,7 @@ class NCBI:
                 starting_cols = [col for col in ["Sample #","Test date","Sample ID","bioproject_accession","Primer Scheme"] if col in seq_report_df.columns]
                 renamed_cols = {"Test date":"collection_date","Sample #":"sample_name","Sample ID":"sample_title"}
                 ct_cols = []
-                print("starting_cols:",starting_cols)
+                # print("starting_cols:",starting_cols)
                 for i,col in self.sars_cov_2_diag_pcr_ct_values.items():
                     pcr_ct_col_name = f'sars_cov_2_diag_pcr_ct_value_{i}'
                     # set col to be included in starting columns
@@ -296,24 +301,45 @@ class NCBI:
                     renamed_cols[col] = pcr_ct_col_name
                     # set new col to be added
                     ct_cols.extend([pcr_ct_col_name,f'sars_cov_2_diag_gene_name_{i}'])
-                print("starting_cols:",starting_cols)
-                print("renamed_cols:",renamed_cols)
+                # print("starting_cols:",starting_cols)
+                # print("renamed_cols:",renamed_cols)
                 biosample_df = seq_report_df[starting_cols].rename(columns=renamed_cols)
             else:
                 biosample_df = seq_report_df
+
+            # ensure all data is present
+            if biosample_df.isnull().values.any():
+                print(f"Metadata file '{self.seq_report}' is missing some data.")
+                warn("")
+
 
             # merge in gisaid accessions
             if not self.gisaid_df.empty:
                 # biosample = pd.merge(biosample,gisaid,on="sample_name_short",how='right')
                 biosample_df = pd.merge(biosample_df,self.gisaid_df,on="sample_name",how='right')
                 biosample_df = biosample_df[biosample_df["gisaid_accession"].notna()]
+                if biosample_df.isnull().values.any():
+                    print(f"\nThe gisaid data (from '{self.gisaid_log}') contains sample(s) not found in your metadata file '{self.seq_report}':")
+                    for col in biosample_df.columns:
+                        if biosample_df[col].isna().values.any():
+                            break
+                    samples_missing_metadata = biosample_df[biosample_df[col].isna()]["sample_name"].tolist()
+                    print(samples_missing_metadata)
+                    self._offer_skip_option(samples_missing_metadata)
+                    warn("")
             else:
                 biosample_df['gisaid_accession'] = 'missing'
             if ignore_dates:
                 biosample_df['isolate'] = ''
             else:
                 biosample_df['isolate'] = "SARS-CoV-2/human/USA/" + biosample_df["sample_name"].astype(str) + "/" + pd.DatetimeIndex(biosample_df['collection_date']).strftime('%Y')
+                print(biosample_df[["sample_name",'isolate',"collection_date","gisaid_accession"]])
+                print(biosample_df[biosample_df["sample_name"]=="CORVASEQ-CLT-002803"].squeeze())
+                # print(biosample_df['isolate'])
             biosample_df["collection_date"] = pd.to_datetime(biosample_df["collection_date"]) # ensures dates are in the desired format
+            no_date = biosample_df[biosample_df["collection_date"].isna()]
+            if not no_date.empty:
+                warn(f"Missing collection date for these samples:\n{no_date}")
             biosample_df['gisaid_accession'] = biosample_df['gisaid_accession'].apply(lambda x: x if str(x)!='nan' else 'missing')
 
             # add config defaults/overrides
@@ -608,21 +634,21 @@ class NCBI:
                 primers = primers[["sample_name","Primer Scheme"]]
                 df = df.merge(primers,on="sample_name")
                 try_others = False
-                primer_map_failed = False
+                # primer_map_failed = False
             else: # if Primer Scheme column missing from file
                 if not self.primer_scheme:
                     raise AttributeError(f"'Primer Scheme' must be a field in the `primer_map` file '{self.primer_map}'. Alternatively, provide `primer_scheme` as an argument.")
                 else:
                     try_others = True
-                    primer_map_failed = True
-        if try_others == True:
-            # if no primer_map or 'Primer Scheme' column isn't found therein, use default for all samples
-            if self.primer_scheme:
-                df["Primer Scheme"] = self.primer_scheme
-            # If there's only one possible scheme in config, use it
-            elif len(self.allowed_schemes) == 1:
-                df["Primer Scheme"] = self.allowed_schemes[0]
-            else: raise AttributeError(f"'Primer Scheme' must be a field in your `seq_report` file '{self.primer_scheme}' \n or else one of the arguments `--primer_map` or `--primer_scheme` must be provided")
+                    # primer_map_failed = True
+            if try_others == True:
+                # if no primer_map or 'Primer Scheme' column isn't found therein, use default for all samples
+                if self.primer_scheme:
+                    df["Primer Scheme"] = self.primer_scheme
+                # If there's only one possible scheme in config, use it
+                elif len(self.allowed_schemes) == 1:
+                    df["Primer Scheme"] = self.allowed_schemes[0]
+                else: raise AttributeError(f"'Primer Scheme' must be a field in your `seq_report` file '{self.primer_scheme}' \n or else one of the arguments `--primer_map` or `--primer_scheme` must be provided")
         
         # verify primer schemes are allowed based on config
         if len(self.allowed_schemes) == 0: raise AttributeError(f"'allowed_schemes' must be specified in `config_file` '{self.config_file}'")
@@ -677,8 +703,7 @@ class NCBI:
             sra_df["library_ID"] = sra_df["sample_name"]
             # remove any sampes that are supposed to be excluded
             if self.exclude_file.exists():
-                with self.exclude_file.open() as fh:
-                    sra_df = sra_df[~sra_df["sample_name"].isin(set([line.strip() for line in fh]))]
+                sra_df = sra_df[~sra_df["sample_name"].isin(self._findExcludables())]
             sra_df = self._addFilenames(sra_df)
             sra_df = sra_df.dropna(subset=["filename"])
             sra_df = sra_df[sra_df["filename"]!=None]
@@ -766,7 +791,7 @@ class NCBI:
         if len(samples_to_maybe_exclude) != 0:
             logging.warning(warning)
             print(self._offer_skip_option(samples_to_maybe_exclude))
-            exit(1)
+            warn("")
 
     def getAllowedSamples(self,all_samples=None):
         """Returns collection of allowed samples from gisaid logfile or else all_samples

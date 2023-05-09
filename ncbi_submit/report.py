@@ -2,7 +2,7 @@
 """Some useful classes for analyzing report.xml files
 """
 
-
+from xml.dom import minidom
 import io
 import re
 
@@ -89,7 +89,6 @@ class Report:
             report_file (str | Path): path to a report*.xml file
         """
 
-        from xml.dom import minidom
         self.report_file = report_file
         self.dom = minidom.parse(io.open(report_file))
         self.submission_status,self.submission_id = self._getSubmissionDetails()
@@ -161,7 +160,8 @@ class Report:
                 report.append(f"{status}\t{len(samples)}")
             num_processed_error = len(status_dict["processed-error"])
             if num_processed_error > 0 and "BioSample" in db:
-                report.append("For help with BioSample errors, see:\n  https://www.ncbi.nlm.nih.gov/projects/biosample/docs/submission/validation/errors.xml")
+                report.append("For help with BioSample errors, see:")
+                report.append("  https://www.ncbi.nlm.nih.gov/projects/biosample/docs/submission/validation/errors.xml")
             if num_processed_error > 0:
                 # if only some samples failed, list them
                 if num_actions != num_processed_error:
