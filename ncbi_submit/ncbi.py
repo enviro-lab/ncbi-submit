@@ -333,8 +333,8 @@ class NCBI:
                 biosample_df['isolate'] = ''
             else:
                 biosample_df['isolate'] = "SARS-CoV-2/human/USA/" + biosample_df["sample_name"].astype(str) + "/" + pd.DatetimeIndex(biosample_df['collection_date']).strftime('%Y')
-                print(biosample_df[["sample_name",'isolate',"collection_date","gisaid_accession"]])
-                print(biosample_df[biosample_df["sample_name"]=="CORVASEQ-CLT-002803"].squeeze())
+                # print(biosample_df[["sample_name",'isolate',"collection_date","gisaid_accession"]])
+                # print(biosample_df[biosample_df["sample_name"]=="CORVASEQ-CLT-002803"].squeeze())
                 # print(biosample_df['isolate'])
             biosample_df["collection_date"] = pd.to_datetime(biosample_df["collection_date"]) # ensures dates are in the desired format
             no_date = biosample_df[biosample_df["collection_date"].isna()]
@@ -1183,6 +1183,7 @@ class NCBI:
         if db == "bs_sra":
             self.upload_if_not_there("sra_biosample.xml")
             # move to directory containing fastqs files to upload
+            if not self.fastq_dir: raise AttributeError("`fastq_dir` is required when submitting samples")
             os.chdir(self.fastq_dir)
             # find and upload all (fastq) files in any column labeled "filename*"
             sra_df = self._prep_sra_df(use_existing=True)

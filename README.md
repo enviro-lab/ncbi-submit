@@ -96,14 +96,18 @@ ncbi_submit ftp \
     --test_mode --test_dir \
     --config "${NCBI_CONFIG}" \
     --outdir "${NCBI_DIR}" \
-    -u "${ncbi_username}" \
-    -p "${ncbi_password}" \
     --fastq_dir "${FASTQS}"
+# wait a while and try this to download reports and view submission status
+ncbi_submit ftp \
+    --check --db bs_sra \
+    --test_mode --test_dir \
+    --config "${NCBI_CONFIG}" \
+    --outdir "${NCBI_DIR}" 
 ```
 #### Python:
 ```python
 ncbi.submit(db="bs_sra)
-# wait awhile and try this to download reports and view submission status
+# wait a while and try this to download reports and view submission status
 ncbi.check(db="bs_sra)
 ```
 
@@ -123,8 +127,6 @@ Then run `ncbi_submit ftp --submit` to submit to GenBank
 ```console
 # dowload report.xml files to get accesssions and add them to genbank.tsv
 ncbi_submit file_prep --prep_genbank \
-    -u "${ncbi_username}" \
-    -p "${ncbi_password}" \
     --outdir "${NCBI_DIR}" \
     --config ${NCBI_CONFIG} \
     --fasta "${GENERIC_CONSENSUS//PLATE/$PLATE}" \
@@ -136,8 +138,6 @@ ncbi_submit ftp \
     --test_mode --test_dir \
     --config "${NCBI_CONFIG}" \
     --outdir "${NCBI_DIR}" \
-    -u "${ncbi_username}" \
-    -p "${ncbi_password}" \
     --fastq_dir "${FASTQS}"
 ```
 #### Python:
@@ -160,14 +160,12 @@ This works for whichever db you want to check on. If not specified, you'll get r
 
 #### Shell:
 ```console
-# check GenBank submission (NOTE: db='gb')
+# check status of GenBank submission (NOTE: db='gb')
 ncbi_submit ftp \
     --check --db gb \
     --test_mode --test_dir \
     --config "${NCBI_CONFIG}" \
-    --outdir "${NCBI_DIR}" \
-    -u "${ncbi_username}" \
-    -p "${ncbi_password}"
+    --outdir "${NCBI_DIR}"
 ```
 #### Python:
 ```python

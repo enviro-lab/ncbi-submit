@@ -6,7 +6,7 @@ import textwrap, argparse
 
 def add_file_prep_args(parser_file_prep):
     ## file_prep
-    parser_file_prep.add_argument("--fastq_dir",type=Path,required=True,
+    parser_file_prep.add_argument("--fastq_dir",type=Path,required=False,
         help="Path to directory containing one compiled fastq file for each sample")
     parser_file_prep.add_argument("--seq_report",type=Path,required=True,
         help="Path to sequencing report CSV")

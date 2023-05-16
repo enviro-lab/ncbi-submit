@@ -1,5 +1,14 @@
 # Change Log
 
+## v0.4.6
+### Changed
+* `--fastq_dir` not required if checking on submission
+* verifies existance of any provided filenames or raises FileNotFound
+* fixed primer scheme determination
+* various minor syntax edits
+### Removed
+* unused imports
+
 ## v0.4.5
 ### Changed
 * fastq.gz files are allowed (instead of just fastq files)
