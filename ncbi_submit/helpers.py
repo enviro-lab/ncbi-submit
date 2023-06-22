@@ -2,10 +2,14 @@
 """A set up useful tools/functions that aren't specific to the other classes
 """
 
+import logging
+from typing import Literal
 import pandas as pd
 from pathlib import Path
 import io
 from Bio import SeqIO
+
+from ncbi_submit.report import Report
 
 main_dir = list(Path(__file__).resolve().parents)[1]
 
@@ -24,7 +28,7 @@ def warn(message):
     exit(1)
 
 def getConfig(config_file=None):
-    """Returns config file as a dictionary and it's location"""
+    """Returns `config_file` as a dictionary and it's path"""
 
     # decide config file (use example if not given)
     if config_file==None:
@@ -36,28 +40,28 @@ def getConfig(config_file=None):
             "`--ncbi_config` file must be provided")
     # add config vars to `config` dict and return
     config = {}
-    print("reading config:")
+    logging.info("reading config:")
     exec(io.open(config_file).read(), config)
     return {k:v for k,v in config.items() if k!='__builtins__'}, config_file
 
 def hasUnderscoredHeaders(columns):
-    """Returns True if field names starting with '_'"""
+    """Returns True if any field names in `columns` start with '_'"""
 
     return "_sample_name" in columns or "_geo_loc_name" in columns
 
 def isBioProjectAccession(accession):
-    """Returns True if accession look like a BioProject acession"""
+    """Returns True if `accession` looks like a BioProject accession"""
 
     if accession==None:
         return False
     return True in [accession.startswith(x) for x in ("PRJE","PRJN","PRJD","PSUB")]
 
 def checkBioProjectAccessions(accessions):
-    """Passes if all accessions look like accessions, else raises ValueError
+    """Passes if all `accessions` look like accessions, else raises ValueError
 
     
         Args:
-            accession (Collection): accessions to check
+            `accession` (Collection): accessions to check
 
         Raises:
             ValueError: if accessions appear invalid
@@ -68,11 +72,11 @@ def checkBioProjectAccessions(accessions):
             raise ValueError(f"The provided BioProject accession '{acc}' does not fit ther standard format (PRJ[D|E|N]xxxxxx or PSUBxxxxxx).")
 
 def finalize_df(df,final_cols=[]):
-    """Returns df with final_cols as the only columns or else all columns
+    """Returns `df` with `final_cols` as the only columns or else all columns
     
     Args:
-        df (DataFrame): the base dataset to write out
-        final_cols (list): if provided, only these columns will be included
+        `df` (DataFrame): the base dataset to write out
+        `final_cols` (list): if provided, only these columns will be included
     """
 
     return  df[final_cols] if final_cols else df.copy()
@@ -81,13 +85,13 @@ def df_2_tsv(df,outfile,name=None):
     """Writes out df as tsv file (without index)
     
     Args:
-        df (DataFrame): the base dataset to write out
-        outfile (str | Path): where to write TSV
-        name (str): if provided, `name` and `outfile` are logged in stdout
+        `df` (DataFrame): the base dataset to write out
+        `outfile` (str | Path): where to write TSV
+        `name` (str): if provided, `name` and `outfile` are logged in stdout
     """
 
     if name:
-        print(f"Writing `{name}` outfile:",outfile)
+        print(f"Writing `{name}` outfile:\n   {outfile}")
     outdir = Path(outfile).parent
     outdir.mkdir(parents=True,exist_ok=True)
     df.to_csv(outfile, index=False, sep="\t")
@@ -96,8 +100,8 @@ def series2dict(series:pd.Series,limit_to:list=None):
     """Converts series to list
 
     Args:
-        series (pd.Series): The series to convert to a dict
-        limit_to (list, optional): If provided, only the listed attributes will apear in the final dict
+        `series` (pd.Series): The series to convert to a dict
+        `limit_to` (list, optional): If provided, only the listed attributes will apear in the final dict
     """
 
     if limit_to == None:
@@ -115,14 +119,16 @@ def check_missing(actual_cols,required_cols,name):
 
 def remove_item(unwanted_item,a_list):
     """Returns list without specified column"""
+
     return [col for col in a_list if col != unwanted_item]
 
 def remove_items(unwanted_items,a_list):
-    """Returns list with each unwanted item excluded"""
+    """Returns a list with each item in `unwanted_items` excluded from `a_list`"""
+
     return list(set(a_list)-set(unwanted_items))
 
-def ensureAllSamplesHaveNames(biosample):
-    """If any sample_name values are NaN, print this warning and exit"""
+def ensureAllSamplesHaveNames(biosample:pd.DataFrame):
+    """If any sample_name values are NaN in `biosample` DataFrame, print this warning and exit"""
 
     missing:pd.DataFrame = biosample[biosample["sample_name"].isna()]
     if missing.empty: return
@@ -142,7 +148,11 @@ def ensureAllSamplesHaveNames(biosample):
     exit(1)
 
 def get_bioproject_spuid(ncbi):
-    """Returns SPUID for use if creating new BioProject"""
+    """Returns SPUID to use if creating new BioProject
+    
+    Args:
+        `ncbi` (NCBI): An object storing information about the submission data, goals, and useful methods
+    """
 
     ncbi:NCBI
     return f'<SPUID spuid_namespace="{ncbi.centerAbbr}">{ncbi.bioproject_presets["spuid"]}</SPUID>'
@@ -171,7 +181,7 @@ def remove_empty_file(file):
             file.unlink()
 
 def ensure_outdir_viable(outdir):
-    """Ensures outdir isn't a file and makes the directory, if needed
+    """Ensures `outdir` isn't a file and makes the directory, if needed
     
     Returns:
         Path(outdir)
@@ -184,3 +194,43 @@ def ensure_outdir_viable(outdir):
         outdir.mkdir(exist_ok=True,parents=False)
     return outdir
 
+def bioproject_in_report(report,bioproject):
+    """Returns True if `bioproject` is in `report`"""
+
+    with open(report) as fh:
+        for line in fh:
+            if bioproject in line:
+                return True
+    return False
+
+def get_accession_dict_from_file(report_file,db:Literal["bs_sra","bs","sra","gb",None]=None,bioproject=None,ignore_failure=True):
+    """Returns dict of accessions for each sample in `report_file`
+    
+    Args:
+        `report_file` (str | Path): path to NCBI report file to read in
+        `db` (str): name of database for which to get accessions
+        `bioproject` (str): BioProject accession to include exclusively, if provided
+    """
+
+    if bioproject != None and not bioproject_in_report(report_file,bioproject):
+        return {}
+    report = Report(report_file)
+    accession_dict = {}
+    if db == "bs_sra":
+        biosample_accessions = report.getAccessionDict("BioSample",by_sample_name=True,ignore_failure=ignore_failure)
+        sra_accessions = report.getAccessionDict("SRA",by_sample_name=True,ignore_failure=ignore_failure)
+        for sample_id in set(biosample_accessions.keys()).union(sra_accessions.keys()):
+            biosample_accession = biosample_accessions.get(sample_id)
+            sra_accession = sra_accessions.get(sample_id)
+            accession_dict[sample_id] = {"BioSample":biosample_accession,"SRA":sra_accession}
+    elif db == "bs":
+        biosample_accessions = report.getAccessionDict("BioSample",by_sample_name=True,ignore_failure=ignore_failure)
+        for sample_id,biosample_accession in biosample_accessions.items():
+            accession_dict[sample_id] = {"BioSample":biosample_accession}
+    elif db == "sra":
+        sra_accessions = report.getAccessionDict("SRA",by_sample_name=True,ignore_failure=ignore_failure)
+        for sample_id,sra_accession in sra_accessions.items():
+            accession_dict[sample_id] = {"SRA":sra_accession}
+    else:
+        raise NotImplementedError("Not yet prepared to handle databases other than 'bs_sra','bs','sra'")
+    return accession_dict

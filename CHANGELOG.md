@@ -1,8 +1,15 @@
 # Change Log
 
 ## Unreleased
+## v0.5.0
 ### Changed
-* Readme reflects new behavior
+* readme reflects new behavior
+* example files can be produced
+* ftp now has subparsers for check/submit rather than --check/--submit arguments
+* fixed bug filling empty bs attributes with bp accession
+### Added
+* can compile all biosample accessions from lab's ftp submissions
+* can now prepare xml for read updates alongside regular submissions
 
 ## v0.4.1
 ### Changed

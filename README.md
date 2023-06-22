@@ -4,13 +4,13 @@ Submitting data to public databases is super important for publically funded lab
 ***
 ## Installation:
 To install from PyPI in a virtual environment `.venv`:
-```console
+```bash
 python3 -m venv .venv
 . .venv/bin/activate
 pip install ncbi-submit
 ```
 To install from conda (not yet set up) in a new environment `ncbi`:
-```console
+```bash
 conda create -n ncbi ncbi-submit
 ```
 
@@ -21,7 +21,7 @@ Add NCBI credentials to file `./.login_credentials` or edit them in either:
 * `./config/config.py`
 
 To test creating all example files, run:
-```console
+```bash
 ./example/test.sh
 ```
 This script ^^^ could also be a good starting point for your own NCBI submission pipelines. Note: There are several blocks of code in there can be commented in/out, as needed.
@@ -42,6 +42,7 @@ There are three main actions the script can do:
   * Interacts with NCBI's ftp host to do either of the following:
     * `submit` data to NCBI databases 
     * `check` on previous ftp submissions
+    * `get-accessions` from all previous ftp submissions
 * `example`:
   * Writes out example files for one or both of:
     * config.py file (tells ncbi_submit lots of important info)
@@ -51,7 +52,7 @@ There are three main actions the script can do:
 The required parameters vary by which of the above actions you're attempting but at minimum require a `plate` and `outdir`. To limit the number of parameters required via command line, a `config` file must be used. When running from the command line, one of the three actions (`file_prep` or `ftp`) must be specified. With python, these are associated methods you may use on a single NCBI object.
 
 #### Get example `config.py` file:
-```console
+```bash
 ncbi_setup example --config --outdir "nbci"
 ```
 
@@ -70,9 +71,9 @@ ncbi.write_presubmission_metadata()
 ```
 
 ### File Preperation
-#### Shell:
-```console
-python ncbi_interact.py file_prep \
+##### Shell:
+```bash
+ncbi_submit file_prep \
     --test_mode --test_dir \
     --config "${NCBI_CONFIG}" \
     --seq_report "${SEQ_REPORT}" \
@@ -83,16 +84,16 @@ python ncbi_interact.py file_prep \
     --fastq_dir ${FASTQS} \
     --plate "${PLATE}"
 ```
-#### Python:
+##### Python:
 ```python
 ncbi.write_presubmission_metadata()
 ```
 
 ### File Submission
-#### Shell:
-```console
-python ncbi_interact.py ftp \
-    --submit --db bs_sra \
+##### Shell:
+```bash
+ncbi_submit ftp submit \
+    --db bs_sra \
     --test_mode --test_dir \
     --config "${NCBI_CONFIG}" \
     --outdir "${NCBI_DIR}" \
@@ -100,11 +101,11 @@ python ncbi_interact.py ftp \
     -p "${ncbi_password}" \
     --fastq_dir "${FASTQS}"
 ```
-#### Python:
+##### Python:
 ```python
-ncbi.submit(db="bs_sra)
+ncbi.submit(db="bs_sra")
 # wait awhile and try this to download reports and view submission status
-ncbi.check(db="bs_sra)
+ncbi.check(db="bs_sra")
 ```
 
 ### GenBank submission
@@ -115,11 +116,11 @@ To link your fasta in GenBank to the associated reads, you'll want to add in the
     * (Do this if you submitted to BioSample via NCBI's Submission Portal)
   * use ncbi_interact.py
     * (Do this to avoid manual uploads  via NCBI's Submission Portal)
-#### Shell:
-```console
+##### Shell:
+```bash
 # dowload report.xml files to get accesssions from
-python ncbi_interact.py ftp \
-    --check --db ${DB} \
+ncbi_submit ftp check \
+    --db ${DB} \
     --outdir "${NCBI_DIR}" \
     --config "${NCBI_CONFIG}" \
     -u "${ncbi_username}" \
@@ -128,15 +129,15 @@ python ncbi_interact.py ftp \
     --fastq_dir "${FASTQS}"
 
 # add accessions to genbank.tsv
-python ncbi_interact.py --prep_genbank \
+ncbi_submit --prep_genbank \
     --outdir "${NCBI_DIR}" \
     --config ${NCBI_CONFIG} \
     --fasta "${GENERIC_CONSENSUS//PLATE/$PLATE}" \
     --plate "${PLATE}"
 
 # submit to GenBank (NOTE: db='gb')
-python ncbi_interact.py ftp \
-    --submit --db gb \
+ncbi_submit ftp submit \
+    --db gb \
     --test_mode --test_dir \
     --config "${NCBI_CONFIG}" \
     --outdir "${NCBI_DIR}" \
@@ -144,7 +145,7 @@ python ncbi_interact.py ftp \
     -p "${ncbi_password}" \
     --fastq_dir "${FASTQS}"
 ```
-#### Python:
+##### Python:
 ```python
 # dowload report.xml files to get accesssions from
 ncbi.check(db="bs_sra)
@@ -159,23 +160,91 @@ ncbi.write_genbank_submission_zip()
 Wait awhile (10+ minutes) for NCBI to start processing the submission. Then run this to download reports and view submission status.
 This works for whichever db you want to check on. If not specified, you'll get results on all submitted dbs.
 
-#### Shell:
-```console
+##### Shell:
+```bash
 # check GenBank submission (NOTE: db='gb')
-python ncbi_interact.py ftp \
-    --check --db gb \
+ncbi_submit ftp check \
+    --db gb \
     --test_mode --test_dir \
     --config "${NCBI_CONFIG}" \
     --outdir "${NCBI_DIR}" \
     -u "${ncbi_username}" \
     -p "${ncbi_password}"
 ```
-#### Python:
+##### Python:
 ```python
 # check GenBank submission (NOTE: db='gb')
 ncbi.check(db="gb)
 ```
 
+### Download all reports and get accessions
+To acquire the accessions for all samples submitted via ftp under your group's account, `ncbi_submit` can download all xml report files and parse out the accession details. A directory will be created in `outdir` containing all submission-specific directories, each containing its report files. The `-f` or `--files` flag allows the use of a list of report files to parse. If provided, those files will be parsed for accession details rather than downloading the latest report files. The database can be specifed to indicate which accessions are desired and yield csvs (for the BioProject associated with your current `config` file) at `<outdir>/accessions_<bioproject>.csv` with the following fields:
+| database | fields |
+|-|-|
+| 'bs_sra' | sample_name, BioSample, SRA |
+| 'bs' | sample_name, BioSample |
+| 'sra' | sample_name, SRA |
+
+#### Get accessions by downloading report.xml files
+##### Shell:
+```bash
+ncbi_submit ftp get-accessions \
+    --db "bs_sra" \
+    --config "${NCBI_CONFIG}" \
+    --outdir "${REPORT_DIR}" \
+    -u "${ncbi_username}" \
+    -p "${ncbi_password}" \
+```
+##### Python:
+```python
+ncbi.get_all_accessions(db="bs_sra)
+```
+
+#### Get accessions from list of report.xml files
+##### Shell:
+```bash
+ncbi_submit ftp get-accessions \
+    --db "bs_sra" \
+    --config "${NCBI_CONFIG}" \
+    --outdir "${REPORT_DIR}" \
+    -u "${ncbi_username}" \
+    -p "${ncbi_password}" \
+    -f s1/report.xml s2/report.xml
+```
+##### Python:
+```python
+ncbi.get_all_accessions(db="bs_sra",report_files=["file1", "file2"])
+```
+
+
+## Updating samples that have already been submitted
+### Fastq read updates
+If you want to update the reads for a sample you've already submitted, you must do the followind:
+1. Email nlm-support@nlm.nih.gov and supply them with a list of SRA runs to suppress.
+2. Once suppressed, you can upload a new version of the sample where the `submission.xml`
+  * references the BioSample (rather than submitting a new BioSample block) and
+  * has a new, unique SPUID for the SRA action block.
+
+The `submission.xml` can be prepared as shown below and then submitted as discussed previously in [File Submission](#file-submission). Whereas normally an error would occur if a previously-submitted sample appears in the `seq_report` file, the flag `--update_reads` tells `ncbi_submit` to search for BioSasmple accessions of and include previously-submitted samples in the `submission.xml`. In most cases, if you are updating reads for a sample, a new SRA spuid is required. The `--spuid_endings` flag takes a parameter mapping samples that are being updated to a suffix. For any explicitely names samples, the suffix(es) will be added at the end of the automatically-generated SPUID. Usually '2' is a good suffix choice (unless another update has already been made using that same suffix for the sample of interest).
+
+### Other metadata updates
+These are not currently supported but could be added in the future if they seem important/useful.
+
+##### Shell:
+```bash
+ncbi_submit file_prep \
+    --config "${NCBI_CONFIG}" \
+    --seq_report "${SEQ_REPORT}" \
+    --outdir "${NCBI_DIR}" \
+    --fastq_dir ${FASTQS} \
+    --plate "${PLATE}" \
+    --update_reads \
+    --spuid_endings 'suffix1:samp1,samp2;suffix2:samp3'
+```
+##### Python:
+```python
+ncbi.write_presubmission_metadata(update_reads=True,spuid_endings={"sample1":"suffix1", "sample2":"suffix1", "sample3":"suffix2"})
+```
 
 ***
 ## Input Paths

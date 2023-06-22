@@ -24,7 +24,7 @@ ncbi_submit \
 
 # # Do XML submission for BioSample and SRA
 # ncbi_submit \
-#     ftp --submit --db 'bs_sra' \
+#     ftp submit --db 'bs_sra' \
 #     --plate '01-06-23-1-V2A' \
 #     --fastq_dir "${plate_dir}/fastqs/" \
 #     --outdir "${plate_dir}/ncbi/" 
@@ -35,7 +35,7 @@ ncbi_submit \
 
 # # Check submission and pull back reports (which contain submission status and BioSample accessions, if processed-ok)
 # ncbi_submit \
-#     ftp --check \
+#     ftp check \
 #     --plate '01-06-23-1-V2A' \
 #     --fastq_dir "${plate_dir}/fastqs/" \
 #     --outdir "${plate_dir}/ncbi/" 
@@ -56,14 +56,14 @@ ncbi_submit \
 
 ## Do XML submission for GenBank (Note: not tested)
 # ncbi_submit \
-#     ftp --submit --db 'gb' \
+#     ftp submit --db 'gb' \
 #     --plate '01-06-23-1-V2A' \
 #     --fastq_dir "${plate_dir}/fastqs/" \
 #     --outdir "${plate_dir}/ncbi/" 
 
 # # Check on GenBank submission (Note: not tested)
 # ncbi_submit \
-#     ftp --check \
+#     ftp check \
 #     --db 'gb' \
 #     --plate '01-06-23-1-V2A' \
 #     --fastq_dir "${plate_dir}/fastqs/" \

@@ -6,6 +6,7 @@ from ftplib import FTP
 from io import StringIO
 import os, logging
 from textwrap import dedent
+from typing import Literal
 import pandas as pd
 from ncbi_submit.helpers import *
 from ncbi_submit.report import Report
@@ -27,15 +28,16 @@ from Bio import SeqIO
 # self.attempt_num = attempt_num
 
 class NCBI:
-    def __init__(self,plate,fastq_dir,seq_report,outdir,barcode_map=None,
-                 config=None,controls=None,gisaid_log=None,primer_map=None,
-                 primer_scheme=None,fasta=None,ncbiUser=None,ncbiPass=None,
-                 host=None,test_dir=False,test_mode=False,use_existing=False,
-                 subdir=None,vary_spuid=False) -> None:
+    def __init__(self,plate=None,fastq_dir=None,seq_report=None,outdir=None,
+                 barcode_map=None,config=None,controls="",gisaid_log=None,
+                 primer_map=None,primer_scheme=None,fasta=None,ncbiUser=None,
+                 ncbiPass=None,host=None,test_dir=False,test_mode=False,
+                 use_existing=False,subdir=None,vary_spuid=False,
+                 allow_submitted=False,extra_accessions=None,suppressed_accessions=None) -> None:
         """Creates an object that can prepare, submit, and track csv/xml submission files 
 
         Args:
-            config: (str, Path, None) Location of the config file to use
+            `config`: (str, Path, None) Location of the config file to use
         """
 
         # get any variables from config
@@ -49,7 +51,7 @@ class NCBI:
         self.contact = cf["contact"]
         self.email = cf["email"]
         self.phone = cf["phone"] # not used (but could be for template generation)
-        self.controls = controls or cf.get("controls")
+        self.controls = controls or cf.get("controls","")
         self.ncbiCountry = cf["ncbiCountry"]
         self.affiliation = cf["affiliation"]
         self.authors = cf["authors"]
@@ -67,6 +69,10 @@ class NCBI:
         self.test_mode = test_mode if test_mode==True else cf.get("test_mode",test_mode)
         self.use_existing = use_existing
         self.vary_spuid = vary_spuid
+        self.reports_dir = cf.get("reports_dir")
+        self.sra_bs_accessions_df = pd.DataFrame()
+        self.extra_accessions = extra_accessions or cf.get("extra_accessions",None)
+        self.suppressed_accessions = suppressed_accessions or cf.get("suppressed_accessions",None)
 
         # set plate-specific details
         self.fastq_dir = Path(fastq_dir) if fastq_dir else None
@@ -79,6 +85,7 @@ class NCBI:
         self.primer_map = primer_map
         self.primer_scheme = primer_scheme
         self.fasta = fasta
+        self.allow_submitted=allow_submitted
 
         # vars for ftp
         possible_report_dirs = list(self.outdir.glob("*bs*_reports")) # there should only be one (most likely)
@@ -138,7 +145,7 @@ class NCBI:
         """Checks for login info in config or env variables
 
         Args:
-            missing_ok (bool, optional): If False, warns about missing login details. Defaults to True.
+            `missing_ok` (bool, optional): If False, warns about missing login details. Defaults to True.
         """
 
         if not self.ncbiUser:
@@ -184,7 +191,7 @@ class NCBI:
                 seq_report_df = seq_report_df[[col for col in seq_report_df.columns if col != "Sample #"]]
                 seq_report_df = seq_report_df.rename(columns={"Seq ID":"Sample #"})
             # weed out controls
-            if "Sample #" in seq_report_df.columns:
+            if "Sample #" in seq_report_df.columns and self.controls:
                 seq_report_df = seq_report_df[seq_report_df["Sample #"].str.contains(self.controls)==False]
             if "Test date" in seq_report_df.columns:
                 seq_report_df["Test date"] = pd.DatetimeIndex(seq_report_df['Test date']).strftime('%Y-%m-%d')
@@ -230,7 +237,7 @@ class NCBI:
         submitted = pd.read_csv(self.submitted_samples_file,header=None,names=["already_submitted"])["already_submitted"].unique()
         attempted_duplicate = df[df["sample_name"].isin(submitted)]
         if len(attempted_duplicate) > 0:
-            raise ValueError(f"The following sample(s) appear to have already been submitted.\n\n{attempted_duplicate}\n\n * To submit anyway,  remove that sample name from the file ({self.submitted_samples_file}) or temporarily comment out the variable `submitted_samples` in the `config_file`. \n * To exclude a sample from submission, add it to {self.exclude_file}")
+            raise ValueError(f"The following sample(s) appear to have already been submitted.\n\n{attempted_duplicate}\n\n * To submit anyway, you can \n   * add the flag `--update_reads` if you are only updating SRA details\n     and have already suppressed the previous submission. \n   * Alternatively, you can remove the offending sample name(s) from the file \n     '{self.submitted_samples_file}'\n     or temporarily comment out the variable `submitted_samples` in the `config_file`\n     to prevent `ncbi_submit` from checking for previously-submitted samples. \n * To exclude a sample from submission, add it to \n   '{self.exclude_file}'")
 
     def _findExcludables(self):
         """Returns list of samples to exclude (if found in file `self.exclude_file`)"""
@@ -251,7 +258,7 @@ class NCBI:
         If `test_dir==True`: sets all accessions to default test accession.
 
         Args:
-            df (DatFrame): the dataframe to which to add accessions
+            `df` (DatFrame): the dataframe to which to add accessions
 
         Raises:
             ValueError: if accessions appear invalid
@@ -269,7 +276,7 @@ class NCBI:
             if not "bioproject_accession" in df.columns:
                 df["bioproject_accession"] = default_production_accession
             else:
-                df = df.fillna(default_production_accession)
+                df["bioproject_accession"] = df["bioproject_accession"].fillna(default_production_accession)
                 # ensure all accessions look like accessions
                 checkBioProjectAccessions(df["bioproject_accession"])
         return df
@@ -299,7 +306,7 @@ class NCBI:
                 renamed_cols = {"Test date":"collection_date","Sample #":"sample_name","Sample ID":"sample_title"}
                 ct_cols = []
                 # ct_values = {}
-                print("starting_cols:",starting_cols)
+                # print("starting_cols:",starting_cols)
                 for i,col in self.sars_cov_2_diag_pcr_ct_values.items():
                     pcr_ct_col_name = f'sars_cov_2_diag_pcr_ct_value_{i}'
                     # set col to be included in starting columns
@@ -309,8 +316,8 @@ class NCBI:
                     # set new col to be added
                     # ct_values[pcr_ct_col_name] = col
                     ct_cols.extend([pcr_ct_col_name,f'sars_cov_2_diag_gene_name_{i}'])
-                print("starting_cols:",starting_cols)
-                print("renamed_cols:",renamed_cols)
+                # print("starting_cols:",starting_cols)
+                # print("renamed_cols:",renamed_cols)
                 biosample_df = seq_report_df[starting_cols].rename(columns=renamed_cols)
                 # for col_name, value in ct_values.items():
                 #     print(col_name,value)
@@ -339,8 +346,7 @@ class NCBI:
 
             # add config defaults/overrides
             for k,col in self.biosample_presets.items():
-                if not k in ("bioproject_accession","bioproject_test_accession"):
-                    biosample_df[k] = col
+                biosample_df[k] = col
 
             # use test bioproject for all samples (if --test_dir==True)
             # use default bioproject for any samples that don't have one (if --test_dir==False)
@@ -383,24 +389,26 @@ class NCBI:
                     for sample in extras:
                         print(f"echo '{sample}' >> '{self.exclude_file}'")
                     warn("")
-            # ensure all samples present have not been previously submitted
-            self._ensure_new_names_only(biosample_df)
+            if not self.allow_submitted:
+                # ensure all samples present have not been previously submitted
+                self._ensure_new_names_only(biosample_df)
 
         logging.info("BioSample")
         logging.info(biosample_df)
         self.biosample["final_cols"] = actual_cols
 
         self.biosample["df"] = biosample_df
-        return biosample_df
+
+        return biosample_df[actual_cols]
 
     # def seekAccessionsDict(self):
     def get_accessions(self,as_dict=False,as_df=False,biosample_accessions:Path=None,require_biosample=True):
         """Returns dict or df mapping sequence id to biosample accession
 
         Args:
-            as_dict (bool, optional): _description_. Defaults to False.
-            as_df (bool, optional): _description_. Defaults to False.
-            biosample_accessions (Path, optional): path to accession file. Defaults to None.
+            `as_dict` (bool, optional): _description_. Defaults to False.
+            `as_df` (bool, optional): _description_. Defaults to False.
+            `biosample_accessions` (Path, optional): path to accession file. Defaults to None.
                 If provided, uses file to determine accessions
                 If not, recursively searches all report*.xml files in `report_dir` for one containing BioSample accessions
 
@@ -439,8 +447,8 @@ class NCBI:
                 for file in sorted([f for f in self.report_dir.glob("*/report.*") if f.name != "report.xml"],reverse=True):
                     logging.info(f"Checking {file} for accessions")
                     report = Report(file)
-                    if report.biosamplesOk():
-                        accessions_in_file = report.getAccessionDict(by_sample_name=True)
+                    if report.submissionComplete("BioSample"):
+                        accessions_in_file = report.getAccessionDict(db="BioSample",by_sample_name=True)
                         if accessions_in_file:
                             logging.info("Found accessions in",file)
                             accessions.update(accessions_in_file)
@@ -453,8 +461,8 @@ class NCBI:
         """Adds BioSample accessions to GenBank TSV
         
         Args:
-            biosample_accessions (str|Path): Path to tsv mapping biosample accessions to sample_name
-            require_biosample (bool, optional): If True, raises AttributError if accessions can't be added.
+            `biosample_accessions` (str|Path): Path to tsv mapping biosample accessions to sample_name
+            `require_biosample` (bool, optional): If True, raises AttributError if accessions can't be added.
         """
 
         # read in dfs
@@ -499,11 +507,11 @@ class NCBI:
         """Creates GenBank df or adds BioSample accessions to df from existing GenBank TSV
 
         Args:
-            add_biosample (bool, optional): A flag to locate and add BioSample accessions to existing GenBank TSV. Defaults to False.
-            biosample_accessions (str | Path, optional): path to a file downloaded from NCBI containing BioSample accessions
+            `add_biosample` (bool, optional): A flag to locate and add BioSample accessions to existing GenBank TSV. Defaults to False.
+            `biosample_accessions` (str | Path, optional): path to a file downloaded from NCBI containing BioSample accessions
                 if not provided, accessions will be sought from report.xml files
-            ignore_dates (bool, optional): A flag to drop date columns from df
-            require_biosample (bool, optional): If True, raises AttributError if accessions can't be added.
+            `ignore_dates` (bool, optional): A flag to drop date columns from df
+            `require_biosample` (bool, optional): If True, raises AttributError if accessions can't be added.
         """
 
         if self.use_existing:
@@ -538,7 +546,7 @@ class NCBI:
         """Guides user on how to mark desired samples to be excluded from submission.
 
         Args:
-            samples (Collection): Samples that are missing from one input spreadsheet or another
+            `samples` (Collection): Samples that are missing from one input spreadsheet or another
         """
 
         output = ["Any samples that should not be submitted can be written on a line by themselves in a file called",
@@ -552,17 +560,17 @@ class NCBI:
         """Verifies and returns single fastq file basename for SRA
         
         Args:
-            sample_name (str): the sample for which to seek fastq
+            `sample_name` (str): the sample for which to seek fastq
 
         Raises:
             FileNotFoundError: if single fastq file not found for `sample_name`
         """
 
-        possible_files = list(self.fastq_dir.glob(f"*{sample_name}*.fastq"))
+        possible_files = list(self.fastq_dir.glob(f"*{sample_name}*.fastq*"))
         if len(possible_files) == 1:
             file_path:Path = possible_files[0]
         elif len(possible_files) > 1:
-            raise FileNotFoundError(f"Too many potential fastq files for sample '{sample_name}' in {self.fastq_dir}")
+            raise FileNotFoundError(f"Too many potential fastq files for sample '{sample_name}' in \n{self.fastq_dir}")
         else:
             raise FileNotFoundError(f"Can't find expected fastq file for {sample_name} in {self.fastq_dir}\n{self._offer_skip_option([sample_name])}")
         if file_path.exists():
@@ -575,7 +583,7 @@ class NCBI:
         """Returns names of paired fastq files for SRA
         
         Args:
-            sample_name (str): the sample for which to seek fastq
+            `sample_name` (str): the sample for which to seek fastq
 
         Raises:
             FileNotFoundError: if paired fastq files not found for `sample_name`
@@ -602,7 +610,7 @@ class NCBI:
         """Adds primer scheme column to df if possible/needed
         
         Args:
-            df (DataFrame): the dataset to which to add Primer Scheme info
+            `df` (DataFrame): the dataset to which to add Primer Scheme info
 
         Raises:
             AttributeError: if missing required fields/attributes
@@ -651,7 +659,7 @@ class NCBI:
         """Adds paths to filenames for each sample (pair reads get extra filename column)
         
         Args:
-            df (DataFrame): dataframe to which to add filenames
+            `df` (DataFrame): dataframe to which to add filenames
         """
 
         if "illumina" in self.sra_presets["platform"].lower():
@@ -677,7 +685,8 @@ class NCBI:
             if "Primer Scheme" in sra_df.columns:
                 cols.append("Primer Scheme")
             sra_df = sra_df[cols]
-            sra_df = sra_df[~sra_df['sample_name'].isin(self.controls.split("|"))] # weed out controls - we don't want to submit those
+            if self.controls:
+                sra_df = sra_df[~sra_df['sample_name'].isin(self.controls.split("|"))] # weed out controls - we don't want to submit those
             submittable = self.get_gisaid_submitted_samples()
             if not self.barcode_df.empty:
                 sra_df = sra_df.merge(self.barcode_df,on='sample_name',how="outer")
@@ -720,7 +729,7 @@ class NCBI:
         logging.info(sra_df)
         self.sra["df"] = sra_df
         self.sra["final_cols"] = actual_cols
-        return sra_df
+        return sra_df[actual_cols]
 
     # def merge_dfs(self,data,df_names):
     def _prep_merged_df(self):
@@ -754,18 +763,20 @@ class NCBI:
         """Prepares spreadsheets for NCBI submission portal (https://submit.ncbi.nlm.nih.gov/)
 
         Args:
-            sra (bool, optional): A flag to create SRA TSV. Defaults to True.
-            biosample (bool, optional): A flag to create BioSample TSV. Defaults to True.
-            genbank (bool, optional): A flag to create GenBank TSV. Defaults to True.
-            add_biosample (bool, optional): A flag to add biosample accessions to GenBank TSV. Defaults to False.
-            ignore_dates (bool, optional): A flag to drop date columns. Defaults to False.
-            require_biosample (bool, optional): If True, raises AttributError if accessions can't be added.
+            `sra` (bool, optional): A flag to create SRA TSV. Defaults to True.
+            `biosample` (bool, optional): A flag to create BioSample TSV. Defaults to True.
+            `add_biosample` (bool, optional): A flag to add biosample accessions to GenBank TSV. Defaults to False.
+            `ignore_dates` (bool, optional): A flag to drop date columns. Defaults to False.
+            `require_biosample` (bool, optional): If True, raises AttributError if accessions can't be added.
         """
 
         self.check_existing_tsvs()
         self._prep_biosample_df(ignore_dates)
         self._prep_sra_df()
-        self._prep_genbank_df(add_biosample=add_biosample,biosample_accessions=biosample_accessions,ignore_dates=ignore_dates,require_biosample=require_biosample)
+        if self.biosample_presets["package"] != "SARS-CoV-2.wwsurv.1.0":
+            self._prep_genbank_df(add_biosample=add_biosample,biosample_accessions=biosample_accessions,ignore_dates=ignore_dates,require_biosample=require_biosample)
+        else:
+            self.genbank["df"] = pd.DataFrame()
         self._prep_merged_df()
 
     ###############  ^^^^  tsv_prep  ^^^^  ###############
@@ -775,7 +786,7 @@ class NCBI:
     ###############  vvvv  zip_prep  vvvv  ###############
 
     def verifyUnsubmittable(self,samples_to_maybe_exclude,warning=""):
-        """Prints warning and recommends marking samples for exclusion if needed"""
+        """Prints `warning` and recommends marking `samples_to_maybe_exclude` for exclusion if needed"""
 
         if len(samples_to_maybe_exclude) != 0:
             logging.warning(warning)
@@ -786,7 +797,7 @@ class NCBI:
         """Returns collection of allowed samples from gisaid logfile or else all_samples
         
         Args:
-            all_samples (Collection): default samples if no gisaid-submitted-samples exist to limit by
+            `all_samples` (Collection): default samples if no gisaid-submitted-samples exist to limit by
         """
 
         allowed_samples = self.get_gisaid_submitted_samples()
@@ -839,7 +850,8 @@ class NCBI:
         """Writes genbank.tsv to genbank.zip/seqs.scr
 
         Args:
-            biosample_accessions (str|Path): Path to tsv mapping biosample accessions to sample_name
+            `zfh` (handle): zip file handle
+            `biosample_accessions` (str|Path): Path to tsv mapping biosample accessions to sample_name
         """
         
         # add accessions to GenBank TSV
@@ -892,7 +904,7 @@ class NCBI:
         """Writes zipfile for GenBank submission
 
         Args:
-            biosample_accessions (str|Path): Path to tsv mapping biosample accessions to sample_name
+            `biosample_accessions` (str|Path): Path to tsv mapping biosample accessions to sample_name
         """
 
         with ZipFile(self.genbank['zip_file'], "w") as zfh:
@@ -913,24 +925,32 @@ class NCBI:
         xml_maker = GenBank_Submission(self)
         xml_maker.write_xml(self.genbank["xml_file"])
 
-    def write_sra_biosample_xml(self):
-        """Writes out XML for SRA and/or BioSample submission"""
+    def write_sra_biosample_xml(self,update_reads=False,report_files=[],spuid_endings=None,download_reports=False):
+        """Writes out XML for SRA and/or BioSample submission
+        Args:
+            `update_reads` (bool, optional): If True, previously-submitted reads will be updated and linked to their associated BioSample accession. Defaults to False.
+            `report_files` (list|optional): files to use instead of downloading all submitted reports. Defaults to [].
+            `spuid_endings` (str | dict): Maps a sample_name to a suffix to use to make the its SRA SPUID unique
+            `download_reports` (bool, optional): If True and `update_reads` is True, reports will be downloaded. Defaults to False.
+        """
 
-        xml_maker = SRA_BioSample_Submission(self)
+        xml_maker = SRA_BioSample_Submission(self,update_reads=update_reads,report_files=report_files,spuid_endings=spuid_endings,download_reports=download_reports)
         xml_maker.write_xml(self.sra["xml_file"])
 
-    def write_presubmission_metadata(self,sra_only=False,require_biosample=False):
+    def write_presubmission_metadata(self,sra_only=False,require_biosample=False,update_reads=False,report_files=[],spuid_endings=None,download_reports=False):
         """Prepares TSV and XML files
 
         This should be the go-to method for preparing and writing out files for initial submission to BioSample and/or SRA
 
         Args:
-            action (str: "file_prep" | "add_biosample"): 
-                "file_prep": Creates initial TSV and XML files
-                "add_biosample": adds biosample accessions from previous submission to genbank tsv
-            keep_tsvs (bool, optional): If False, TSVs will be deleted. Defaults to True.
-            keep_xmls (bool, optional): If False, XMLs will be deleted. Defaults to True.
-            require_biosample (bool, optional): If True, raises AttributError if accessions can't be added.
+            `sra_only` (bool, optional): If True, BioSample xml will not be produced for any samples. Defaults to False.
+            `require_biosample` (bool, optional): If True, raises AttributError if accessions can't be added.
+            `update_reads` (bool, optional): If True, previously-submitted reads will be updated and linked to their associated BioSample accession. Defaults to False.
+            `report_files` (list|optional): files to use instead of downloading all submitted reports. Defaults to [].
+            `spuid_endings` (str | dict): Maps a sample_name to a suffix to use to make the its SRA SPUID unique
+            `download_reports` (bool, optional): If True and `update_reads` is True, reports will be downloaded. Defaults to False.
+            `keep_tsvs` (bool, optional): If False, TSVs will be deleted. Defaults to True. NOT CURRENTLY USED
+            `keep_xmls` (bool, optional): If False, XMLs will be deleted. Defaults to True. NOT CURRENTLY USED
         """
 
         ignore_dates = True if sra_only else False
@@ -940,20 +960,21 @@ class NCBI:
 
         # final_dfs = {} # NOTE: not necessary?
         for dataset in (self.sra, self.biosample, self.genbank):
+            if dataset["df"].empty: continue
             df_2_tsv(
                 df=finalize_df(df=dataset["df"],final_cols=dataset["final_cols"]),
                 outfile=dataset["tsv"],name=dataset["name"]
             )
 
         # prepare/write XML
-        print(f'Writing sra/biosample xml:\n   {self.sra["xml_file"]}')
-        self.write_sra_biosample_xml()
+        print(f'Writing `sra/biosample` xml:\n   {self.sra["xml_file"]}')
+        self.write_sra_biosample_xml(update_reads=update_reads,report_files=report_files,spuid_endings=spuid_endings,download_reports=download_reports)
 
     def write_genbank_submission_zip(self,biosample_accessions=None):
         """Prepares Zip file for GenBank submission.
         
         Args:
-            biosample_accessions (str|Path): Path to tsv mapping biosample accessions to sample_name
+            `biosample_accessions` (str|Path): Path to tsv mapping biosample accessions to sample_name
 
         Contents:
           * genbank.xml
@@ -977,15 +998,17 @@ class NCBI:
         """Determines name of subdir
         
         Args:
-            subdir (str): desired subdirectory name (just the basename, not path)
+            `subdir` (str): desired subdirectory name (just the basename, not path)
 
-        Raises:
+        Raises: # TODO: keep or remove?
             AttributeError: if subdir or plate not provided
         """
 
         if subdir: self.subdir = subdir
         elif self.plate: self.subdir = self.plate
-        else: raise AttributeError("Either `subdir` or `plate` must be provided.")
+        else:
+            return None
+            # raise AttributeError("Either `subdir` or `plate` must be provided.")
 
         return self.subdir
 
@@ -994,7 +1017,7 @@ class NCBI:
         """Determines the paths to useful locations for FTP submission/checking"""
 
         self.submit_area = "submit/Test" if self.test_dir else 'submit/Production'
-        self.submit_dir = Path(self.submit_area) / self.subdir
+        self.submit_dir = Path(self.submit_area) / self.subdir if self.subdir else None
         self.initial_submission_dirs = []
         self.ftp_file_sizes = {}
 
@@ -1012,41 +1035,50 @@ class NCBI:
         self.ftp.cwd(self.submit_area)
         logging.info(f"CWD = submit_area: {self.ftp.pwd()}\n")
 
+        # set list of any existing submissions
+        self.initial_submission_dirs = sorted(self.ftp.nlst())
+
     def ensureValidDatabase(self,db):
         """Raises ValueError if `db` is invalid"""
 
         if db not in self.valid_dbs + [None]:
             raise ValueError(f"The `db` '{db}' is invalid. Acceptable `db` values: {self.valid_dbs}")
 
-    def ncbi_interact(self,action,db=None,attempt_num=1,simple=False):
+    def ncbi_interact(self,action,db=None,attempt_num=1,simple=False,report_files=[],download_reports=False):
         """Submits files depending on desired `db`
         
         Args:
-            db (str): NCBI database to which to submit. Options: ["sra","gb","bs_sra","bs",None]
+            `action` (str): "submit" | "check" | "get_all_accessions"
+            `db` (str): NCBI database to which to submit. Options: ["sra","gb","bs_sra","bs",None]
+            `attempt_num` (int, optional): Attempt number of this submission. Defaults to 1.
+            `simple` (bool, optional): If True, less verbose text is output. Defaults to False.
+            `report_files` (list|optional): files to use instead of downloading all submitted reports. Defaults to [].
+            `download_reports` (bool): if True, downloads submitted reports from NCBI's ftp site. Defaults to False.
         """
 
         self.ensureValidDatabase(db)
 
-        # connect to NCBI via ftp and go to Test or Production dir
-        self.ncbiConnect()
-
-        # set list of any existing submissions
-        self.initial_submission_dirs = sorted(self.ftp.nlst())
+        if not (action == "get_all_accessions" and download_reports == False):
+            # connect to NCBI via ftp and go to Test or Production dir
+            self.ncbiConnect()
 
         # submit or check
         if action == "submit":
             self._do_submit(db,attempt_num)
         elif action == "check":
             self._do_check(db,attempt_num,simple)
+        elif action == "get_all_accessions":
+            self.subdir = "getting_accessions"
+            self._get_all_accessions(db,report_files=report_files,download_reports=download_reports)
 
-        self.ftp.quit()
+        if self.ftp: self.ftp.quit()
 
 
     def submit(self,db,attempt_num=1):
         """Submits files depending on desired `db`
         
         Args:
-            db (str): NCBI database to which to submit. Options: ["sra","gb","bs_sra","bs"]
+            `db` (str): NCBI database to which to submit. Options: ["sra","gb","bs_sra","bs"]
         """
 
         self.ncbi_interact("submit",db,attempt_num)
@@ -1056,10 +1088,21 @@ class NCBI:
         """Checks on submission status. If `db` specified, only checks the one. Otherwise checks on any found.
         
         Args:
-            db (str): NCBI database to which to submit. Options: ["sra","gb","bs_sra","bs"]
+            `db` (str): NCBI database to which to submit. Options: ["sra","gb","bs_sra","bs"]
         """
 
         self.ncbi_interact("check",db,attempt_num,simple)
+
+    def get_all_accessions(self,db,report_files=[],download_reports=False):
+        """Returns a list of all accessions in `db`
+        
+        Args:
+            `db` (str): NCBI database to which to submit. Options: ["sra","gb","bs_sra","bs",None]
+            `report_files` (list|optional): files to use instead of downloading all submitted reports. Defaults to [].
+            `download_reports` (bool): if True, downloads submitted reports from NCBI's ftp site. Defaults to False.
+        """
+
+        self.ncbi_interact("get_all_accessions",db,report_files=report_files,download_reports=download_reports)
 
     def enterLocalDir(self,directory):
         """Makes `directory`, if needed, and enters it"""
@@ -1070,7 +1113,7 @@ class NCBI:
         os.chdir(directory)
     
     def upload(self,file:Path,outfile=None):
-        """Uploads `file` to submission dir as outfile"""
+        """Uploads `file` to submission dir as `outfile`"""
 
         if self.test_mode:
             print(f"Test mode - skipping upload of {file}")
@@ -1082,7 +1125,8 @@ class NCBI:
             self.uploaded_something = True
 
     def upload_if_not_there(self,file:Path):
-        "Only uploads files with name/filesize combinations that don't already exist in submission dir"
+        "Only uploads `file` if name/filesize combination doesn't already exist in submission dir"
+
         if Path != type(file) == str : file = Path(file)
         else: raise Exception(f"Unexpected file type for {file}: {type(file)}")
         if not file.exists():
@@ -1133,7 +1177,7 @@ class NCBI:
         """Submits files depending on desired `db`
         
         Args:
-            db (str): NCBI database to which to submit. Options: ["sra","gb","bs_sra","bs"]
+            `db` (str): NCBI database to which to submit. Options: ["sra","gb","bs_sra","bs"]
         """
 
         # make submission directory if needed (and go there)
@@ -1197,8 +1241,8 @@ class NCBI:
         """Returns dict of {filename:fact}
         
         Args:
-            fact (str): detail to get. Options: [modify, perm, size, type, unique, unix.group, unix.mode, unix.owner]
-            contains_str (str): if provided, limits to files with `contains_str` in their name
+            `fact` (str): detail to get. Options: [modify, perm, size, type, unique, unix.group, unix.mode, unix.owner]
+            `contains_str` (str): if provided, limits to files with `contains_str` in their name
         """
 
         # get all filenames and desired fact
@@ -1221,7 +1265,7 @@ class NCBI:
         """Yields time-stamps for each report file in NCBI
         
         Args:
-            as_str (bool):
+            `as_str` (bool):
                 `True`: yields str: "filename   time_stamp"
                 `False`: yields tuple (filename, time_stamp)
         """
@@ -1236,11 +1280,11 @@ class NCBI:
     def isRequestedAttempt(self,submission_dir,subdir,attempt_num=1): #TODO: deprecate?
         """Returns True if `submission_dir` is the one requested based on the args `subdir` and `attempt_num`
         
-        No longer used.
+        No longer used. TODO: deprecate
         Args:
-            submission_dir (str): must just be the basename of the file (not a full path)
-            subdir (str): spedific subdirectory name of this submission
-            attempt_num (int|str): the attempt number of this submission
+            `submission_dir` (str): must just be the basename of the file (not a full path)
+            `subdir` (str): spedific subdirectory name of this submission
+            `attempt_num` (int|str): the attempt number of this submission
         """
 
         expected_end = f"_{attempt_num}" if attempt_num > 1 else ""
@@ -1251,7 +1295,7 @@ class NCBI:
         """Moves to remote NCBI submission directory
         
         Args:
-            ncbi_dir (str): name of a subdirectory of interest within the current `submit_area`
+            `ncbi_dir` (str): name of a subdirectory of interest within the current `submit_area`
         """
 
         logging.info(f"Moving from {self.ftp.pwd()} --> {self.submit_area}/{ncbi_dir}")
@@ -1400,7 +1444,7 @@ class NCBI:
         """Checks on submission status. If `db` specified, only checks the one. Otherwise checks on any found.
         
         Args:
-            db (str): NCBI database to which to submit. Options: ["sra","gb","bs_sra","bs"]
+            `db` (str): NCBI database to which to submit. Options: ["sra","gb","bs_sra","bs"]
         """
 
         if db == None:
@@ -1414,5 +1458,121 @@ class NCBI:
         # check submissions for anyspecified db
         for db in dbs:
             self.analyze_if_possible(db,attempt_num,simple)
+
+    def report_files_in_curr_dir(self):
+        """Lists all report files in current directory"""
+
+        return [f for f in self.ftp.nlst() if f.startswith("report.") and len(f.split(".")) == 3]
+
+    def get_all_report_files(self,db:Literal["sra","gb","bs_sra","bs"]):
+        """Downloads and yields all report files associated with `db` in NCBI submission dir"""
+
+        relevent_submission_dirs = [dir for dir in self.initial_submission_dirs if db in dir]
+        print("relevent submission dirs")
+        print(relevent_submission_dirs)
+
+        for submission_dir in relevent_submission_dirs:
+            # print("submission_dir:",submission_dir)
+            self.enterNcbiSubdir(submission_dir)
+            report_files = self.report_files_in_curr_dir()
+            for report_file in report_files:
+                # print(report_file)
+                output_report_dir = self.getReportDir() / f"reports_{self.get_bioproject_accession()}" / submission_dir
+                if not output_report_dir.exists():
+                    output_report_dir.mkdir(parents=True,exist_ok=True)
+                output_report = output_report_dir / report_file
+                self.ftp.retrbinary("RETR " + report_file, open(output_report, 'wb').write)
+                yield output_report
+            self.ftp.cwd("..")
+
+    def getReportDir(self):
+        """Returns the path to the reports directory, prioritizing the config value `reports_dir` over `outdir`"""
+
+        if self.reports_dir != None: outdir = Path(self.reports_dir)
+        elif self.outdir != None: outdir = self.outdir
+        else: raise AttributeError("Must specify either `reports_dir` (in config) or `outdir` (in initiation or on command line)")
+        return outdir
+
+    def default_acc_dict(self,db):
+        """Returns the default dict based on `db`"""
+        if db == "bs_sra": return {"BioSample":None,"SRA":None}
+        elif db == "sra": return {"SRA":None}
+        elif db == "bs": return {"BioSample":None}
+
+    def _get_all_accessions(self,db,report_files=[],download_reports=False):
+        """Writes out accessions to `outdir`
+
+        Args:
+            `db` (str): NCBI database for which to get accessions.
+            `report_files` (list|optional): files to use instead of downloading all submitted reports. Defaults to [].
+            `download_reports` (bool): if True, downloads submitted reports from NCBI's ftp site. Defaults to False.
+        """
+
+        if not report_files and download_reports==False:
+            raise AttributeError("A list of `report_files` must be provided if `download_reports` is False")
+
+        if download_reports==True:
+            print("Downloading all submitted reports to get accessions")
+            report_files.extend(list(self.get_all_report_files(db)))
+
+        # create list of accessions to ignore if found (because they've been suppressed) so newer versions don't raise AttributeErrors
+        if self.suppressed_accessions:
+            with open(self.suppressed_accessions) as fh:
+                suppressed_accs = set(line.strip() for line in fh)
+        else:
+            suppressed_accs = set()
+
+
+        # accession_dict looks like: {sample1: {"BioSample":bs_acc,"SRA":sra_acc}, sample2: {"BioSample":bs_acc,"SRA":sra_acc}}
+        accession_dict = {}
+        for report_file in report_files:
+            # print("rf:",report_file)
+            for sample_name,accession_info in get_accession_dict_from_file(report_file,db=db,bioproject=self.get_bioproject_accession(),ignore_failure=True).items():
+                # print(sample_name,accession_info)
+                # accession_info (newly discovered accession info) looks like: {"BioSample":bs_acc,"SRA":sra_acc}
+                accession_dict[sample_name] = accession_dict.get(sample_name,self.default_acc_dict("bs_sra"))
+                for db_name,new_acc in accession_info.items():
+                    current_acc = accession_dict[sample_name].get(db_name,None)
+                    # skip suppressed accessions
+                    if new_acc in suppressed_accs: continue
+                    # skip nonexistent accessions
+                    elif not new_acc: continue
+                    # add accession if found and none yet stored
+                    elif not current_acc:
+                        accession_dict[sample_name][db_name] = new_acc
+                    # if already stored, ensure this matches stored accession
+                    elif current_acc != new_acc:
+                        raise AttributeError(f"{db} accession mismatch for {sample_name}: {current_acc} != {new_acc}. If one of these accessions has been suppressed/removed, add the accession to {self.suppressed_accessions} so it can be ignored.")
+
+        # add extra accessions from file, if provided in config
+        if self.extra_accessions:
+            extras = pd.read_csv(self.extra_accessions)
+            for i,r in extras.iterrows():
+                sample_name = r["sample_name"]
+                accession_dict[sample_name] = accession_dict.get(sample_name,self.default_acc_dict("bs_sra"))
+                for db in ("BioSample","SRA"):
+                    new_accession = r[db]
+                    # skip suppressed accessions
+                    if new_accession in suppressed_accs: continue
+                    # skip nonexistent accessions
+                    elif not new_accession or (type(new_accession)==float and str(new_accession)=="nan"): continue
+                    # add accession if found and none yet stored
+                    elif not accession_dict[sample_name][db]:
+                        accession_dict[sample_name][db] = new_accession
+                    # if already stored, ensure this matches stored accession (or is supposed to override it)
+                    elif accession_dict[sample_name][db] != new_accession:
+                        if "override" in extras.columns and r["override"] == True:
+                            accession_dict[sample_name][db] = new_accession
+                        else:
+                            print(type(new_accession))
+                            raise AttributeError(f"{db} accession mismatch for {sample_name}: {accession_dict[sample_name][db]} != {new_accession}. Accessions can be marked to override the those found in NCBI's report files by adding an 'override' column to {self.extra_accessions} and using the value 'True' for the approriate samples (and accessions).")
+                # if sample_name not in accession_dict:
+        
+        self.sra_bs_accessions_df = pd.DataFrame.from_dict(accession_dict).T.reset_index(names=["sample_name"])
+
+        accession_report = self.getReportDir() / f"accessions_{self.get_bioproject_accession()}.csv"
+        print(f"Writing updated accessions csv:\n   {accession_report}")
+        self.sra_bs_accessions_df.to_csv(accession_report,index=False)
+        # df = wide_df.melt(id_vars=wide_df.index, var_name="sample_name")
 
     ### --- ^^^ --- ncbi interaction --- ^^^ --- ###
