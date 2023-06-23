@@ -2,12 +2,15 @@
 """A set up useful tools/functions that aren't specific to the other classes
 """
 
+from functools import partial
+import gzip
 import logging
 from typing import Literal
 import pandas as pd
 from pathlib import Path
 import io
 from Bio import SeqIO
+from Bio.SeqIO.QualityIO import FastqGeneralIterator
 
 from ncbi_submit.report import Report
 
@@ -234,3 +237,20 @@ def get_accession_dict_from_file(report_file,db:Literal["bs_sra","bs","sra","gb"
     else:
         raise NotImplementedError("Not yet prepared to handle databases other than 'bs_sra','bs','sra'")
     return accession_dict
+
+def is_fastq(file):
+    """Returns True if file is fastq or fastq.gz else False
+
+    Args:
+        file (str|Path): filename to check
+    """
+
+    file = Path(file)
+    if "fastq" not in file.suffixes:
+        return False
+    _open = partial(gzip.open,mode="rt") if file.suffix == "gz" else open
+    with _open(file) as fh:
+        for title, seq, qual in FastqGeneralIterator(fh):
+            if title and seq and qual:
+                return True
+            else: return False

@@ -6,26 +6,46 @@
 # Note: To use the 'upload' functionality of this file, you must:
 #   $ pipenv install twine --dev
 
+from configparser import ConfigParser
 import io
 import os
+from pathlib import Path
 import sys
 from shutil import rmtree
 from setuptools import find_packages, setup, Command
 
+def clean(s):
+    return s.strip().strip("'\"")
+
 # Package meta-data.
-NAME = 'ncbi-submit'
-DESCRIPTION = 'A tool for submitting to NCBI (SRA, BioSample, & GenBank).'
-URL = 'https://github.com/enviro-lab/ncbi_interact'
-EMAIL = 'skunklem@uncc.edu'
-AUTHOR = 'Sam Kunkleman'
-REQUIRES_PYTHON = '>=3.8'
-VERSION = ''
+# NAME = 'ncbi-submit'
+# DESCRIPTION = 'A tool for submitting to NCBI (SRA, BioSample, & GenBank).'
+# URL = 'https://github.com/enviro-lab/ncbi_interact'
+# EMAIL = 'skunklem@uncc.edu'
+# AUTHOR = 'Sam Kunkleman'
+# REQUIRES_PYTHON = '>=3.8'
+# VERSION = ''
+toml = Path(__file__).resolve().parent/"pyproject.toml"
+config = ConfigParser(converters={
+    'list': lambda x: [clean(i) for i in x.strip('[]').split(',')],
+    'clean': lambda x: clean(x)
+})
+config.read(toml)
+authors = config.getlist("tool.poetry","authors")
+NAME = config.getclean("tool.poetry","name")
+DESCRIPTION = config.getclean("tool.poetry","description")
+URL = config.getclean("tool.poetry","repository")
+AUTHOR,EMAIL = authors[0].strip(">").split(" <")
+REQUIRES_PYTHON = config.getclean("tool.poetry.dependencies","python")
+VERSION = config.getclean("tool.poetry","version")
+LICENSE = config.getclean("tool.poetry","license")
 
 # What packages are required for this module to be executed?
-REQUIRED = [
-    'biopython',
-    'pandas',
-]
+# REQUIRED = [
+#     'biopython',
+#     'pandas',
+# ]
+REQUIRED = [f"{k}{clean(v)}" for k,v in config["tool.poetry.dependencies"].items() if "python" not in k]
 
 # What packages are optional?
 EXTRAS = {
@@ -105,7 +125,10 @@ setup(
     author_email=EMAIL,
     python_requires=REQUIRES_PYTHON,
     url=URL,
-    packages=find_packages(exclude=["ncbi_submit", "example"]),
+    # packages=find_packages(exclude=["ncbi_submit", "example"]),
+    packages=find_packages(
+        # exclude=["tests", "*.tests", "*.tests.*", "tests.*"]
+    ),
     # packages=find_packages(exclude=["tests", "*.tests", "*.tests.*", "tests.*"]),
     # If your package is a single module, use this instead of 'packages':
     # py_modules=['ncbi_submit'],

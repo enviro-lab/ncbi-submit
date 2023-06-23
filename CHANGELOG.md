@@ -11,6 +11,38 @@
 * can compile all biosample accessions from lab's ftp submissions
 * can now prepare xml for read updates alongside regular submissions
 
+## v0.4.6
+### Changed
+* `--fastq_dir` not required if checking on submission
+* verifies existance of any provided filenames or raises FileNotFound
+* fixed primer scheme determination
+* various minor syntax edits
+### Removed
+* unused imports
+
+## v0.4.5
+### Changed
+* fastq.gz files are allowed (instead of just fastq files)
+
+## v0.4.4
+### Changed
+* fixed check for excludables
+* fixed filling na as bioproject
+* minor printout adjustments
+* minor cleanup
+
+## v0.4.3
+### Changed
+* fixed readme
+* fixed missing text with unimplemented `_offer_skip_option`
+
+## v0.4.2
+### Changed
+* Readme reflects new behavior
+* Readme improved
+* improved setup.py
+* fixed a helper function
+
 ## v0.4.1
 ### Changed
 * `./example` dir is actually included, now

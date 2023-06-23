@@ -335,6 +335,15 @@ class NCBI:
                 # biosample = pd.merge(biosample,gisaid,on="sample_name_short",how='right')
                 biosample_df = pd.merge(biosample_df,self.gisaid_df,on="sample_name",how='right')
                 biosample_df = biosample_df[biosample_df["gisaid_accession"].notna()]
+                if biosample_df.isnull().values.any():
+                    print(f"\nThe gisaid data (from '{self.gisaid_log}') contains sample(s) not found in your metadata file '{self.seq_report}':")
+                    for col in biosample_df.columns:
+                        if biosample_df[col].isna().values.any():
+                            break
+                    samples_missing_metadata = biosample_df[biosample_df[col].isna()]["sample_name"].tolist()
+                    print(samples_missing_metadata)
+                    self._offer_skip_option(samples_missing_metadata)
+                    warn("")
             else:
                 biosample_df['gisaid_accession'] = 'missing'
             if ignore_dates:
@@ -361,7 +370,7 @@ class NCBI:
                 required_bs_attr = ["sample_name","organism","collected_by","collection_date","geo_loc_name","isolation_source"]
             else: # This assumes the user hasn't forgotten any necessary columns. NCBI submission will fail if important attributes are missing, anyway...
                 required_bs_attr = []
-            all_bs_cols = [x.strip() for x in self.biosample_presets.get("all_cols","").split(",") if x]
+            all_bs_cols = [x.strip() for x in self.biosample_presets.get("all_cols","").split(",") if x and not x=="all_cols"]
             if not all_bs_cols:
                 all_bs_cols = ['sample_name','sample_title','bioproject_accession','organism','collected_by','collection_date','geo_loc_name','host','host_disease','isolate','isolation_source','antiviral_treatment_agent','collection_device','collection_method','date_of_prior_antiviral_treat','date_of_prior_sars_cov_2_infection','date_of_sars_cov_2_vaccination','exposure_event','geo_loc_exposure','gisaid_accession','gisaid_virus_name','host_age','host_anatomical_material','host_anatomical_part','host_body_product','host_disease_outcome','host_health_state','host_recent_travel_loc','host_recent_travel_return_date','host_sex','host_specimen_voucher','host_subject_id','lat_lon','passage_method','passage_number','prior_sars_cov_2_antiviral_treat','prior_sars_cov_2_infection','prior_sars_cov_2_vaccination','purpose_of_sampling','purpose_of_sequencing']
                 all_bs_cols.extend(ct_cols)
@@ -699,8 +708,7 @@ class NCBI:
             sra_df["library_ID"] = sra_df["sample_name"]
             # remove any sampes that are supposed to be excluded
             if self.exclude_file.exists():
-                with self.exclude_file.open() as fh:
-                    sra_df = sra_df[~sra_df["sample_name"].isin(set([line.strip() for line in fh]))]
+                sra_df = sra_df[~sra_df["sample_name"].isin(self._findExcludables())]
             sra_df = self._addFilenames(sra_df)
             sra_df = sra_df.dropna(subset=["filename"])
             sra_df = sra_df[sra_df["filename"]!=None]
@@ -717,7 +725,6 @@ class NCBI:
         required_sra_cols = ["bioproject_accession","sample_name","library_ID","title","library_strategy","library_source","library_selection","library_layout","platform","instrument_model","design_description","filetype","filename"]
         all_sra_cols = ['bioproject_accession','sample_name','library_ID','title','library_strategy','library_source','library_selection','library_layout','platform','instrument_model','design_description','filetype','filename','filename2','amplicon_PCR_primer_scheme','amplicon_size','sequencing_protocol_name','raw_sequence_data_processing_method','dehosting_method','sequence_submitter_contact_email']
         extra_cols = [col for col in sra_df.keys() if col not in set(all_sra_cols)]
-        all_sra_cols = all_sra_cols
         # actual_cols = [col for col in all_sra_cols+['sample_name_short'] if col in sra.columns] + extra_cols
         actual_cols = [col for col in all_sra_cols if col in sra_df.columns] + extra_cols
 
