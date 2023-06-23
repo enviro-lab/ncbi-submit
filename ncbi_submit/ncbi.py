@@ -326,7 +326,10 @@ class NCBI:
             else:
                 biosample_df = seq_report_df
 
-
+            # # ensure all data is present
+            # if biosample_df.isnull().values.any():
+            #     print(f"Metadata file '{self.seq_report}' is missing some data.")
+            #     warn("")
 
             # merge in gisaid accessions
             # biosample["sample_name_short"] = biosample['sample_name'].astype(str).apply(lambda x: x.split("-")[-1])

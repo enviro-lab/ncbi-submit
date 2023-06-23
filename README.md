@@ -1,5 +1,5 @@
 # ncbi-submit
-Submitting data to public databases is super important for publically funded laboratories, but it is not always a quick or intuitive process. NCBI Interact provides a simple and repeatable way to upload programmatic submissions to NCBI's SRA and GenBank with shared or unique BioProjects and BioSamples. Data can be uploaded as XML or zip files to either the Test or Production environments, and once there, the reports produced by NCBI can be analyzed to check on submission status and get BioSample accessions.
+Submitting data to public databases is super important for publically funded laboratories, but it is not always a quick or intuitive process. `ncbi-submit` provides a simple and repeatable way to upload programmatic submissions to NCBI's SRA and GenBank with shared or unique BioProjects and BioSamples. Data can be uploaded as XML or zip files to either the Test or Production environments, and once there, the reports produced by NCBI can be analyzed to check on submission status and get BioSample accessions.
 
 ***
 ## Installation:
@@ -29,7 +29,7 @@ This script ^^^ could also be a good starting point for your own NCBI submission
 ***
 ## Usage
 
-`ncbi_interact.py` is intended for use on the command line, but the class `ncbi.NCBI` can be imported and used within custom python scripts.
+`ncbi_submit.py` is intended for use on the command line, but the class `ncbi.NCBI` can be imported and used within custom python scripts.
 
 There are three main actions the script can do:
 * `file_prep`: 
@@ -53,14 +53,14 @@ The required parameters vary by which of the above actions you're attempting but
 
 #### Get example `config.py` file:
 ```bash
-ncbi_setup example --config --outdir "nbci"
+ncbi_submit example --config --outdir "nbci"
 ```
 
 #### Python instantiation (not needed on command line):
 Note: This is the minimum required info for preparing data. Other parameters may be necessary for more functionality or other tasks.  
 ```python
-from modules.ncbi import NCBI
-ncbi = NCBI(
+from ncbi_submit import ncbi_submit
+ncbi = ncbi_submit.NCBI(
     fastq_dir = myFastqDir,
     seq_report = mySeqReport,
     plate = myPlate,
@@ -114,7 +114,7 @@ To link your fasta in GenBank to the associated reads, you'll want to add in the
 * Acquire BioSample accessions via one of these methods:
   * download accessions.tsv file from NCBI
     * (Do this if you submitted to BioSample via NCBI's Submission Portal)
-  * use ncbi_interact.py
+  * use ncbi_submit.py
     * (Do this to avoid manual uploads  via NCBI's Submission Portal)
 ##### Shell:
 ```bash
@@ -162,7 +162,7 @@ This works for whichever db you want to check on. If not specified, you'll get r
 
 ##### Shell:
 ```bash
-# check GenBank submission (NOTE: db='gb')
+# check GenBank submission status (NOTE: db='gb')
 ncbi_submit ftp check \
     --db gb \
     --test_mode --test_dir \
@@ -173,7 +173,7 @@ ncbi_submit ftp check \
 ```
 ##### Python:
 ```python
-# check GenBank submission (NOTE: db='gb')
+# check GenBank submission status (NOTE: db='gb')
 ncbi.check(db="gb)
 ```
 
