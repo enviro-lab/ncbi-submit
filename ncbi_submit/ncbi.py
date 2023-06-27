@@ -338,9 +338,10 @@ class NCBI:
                 # biosample = pd.merge(biosample,gisaid,on="sample_name_short",how='right')
                 biosample_df = pd.merge(biosample_df,self.gisaid_df,on="sample_name",how='right')
                 biosample_df = biosample_df[biosample_df["gisaid_accession"].notna()]
-                if biosample_df.isnull().values.any():
+                non_null_cols = ["collection_date","gisaid_virus_name","gisaid_accession"]
+                if biosample_df[non_null_cols].isnull().values.any():
                     print(f"\nThe gisaid data (from '{self.gisaid_log}') contains sample(s) not found in your metadata file '{self.seq_report}':")
-                    for col in biosample_df.columns:
+                    for col in non_null_cols:
                         if biosample_df[col].isna().values.any():
                             break
                     samples_missing_metadata = biosample_df[biosample_df[col].isna()]["sample_name"].tolist()
@@ -390,17 +391,26 @@ class NCBI:
             # ensure length of biosample matches length of barcodes available (excluding controls)
             if not self.barcode_df.empty:
                 barcode_df_filtered = self.barcode_df[~self.barcode_df['sample_name'].isin(self._findExcludables())]
-                extras = set(barcode_df_filtered["sample_name"].unique()) - set(biosample_df["sample_name"].unique())
-                if len(extras) > 0:
-                    logging.warning(dedent(f"""
+                # seek out/warn about extra samples in barcode map file
+                bc_extras = set(barcode_df_filtered["sample_name"].unique()) - set(biosample_df["sample_name"].unique())
+                if len(bc_extras) > 0:
+                    warning = dedent(f"""
                         Samples exist in barcode file that aren't found in BioSample file:
-                        \t{extras}
+                        \t{bc_extras}
                         Any sample can be skipped by writing it in a line by itself in a file called:
                         {self.exclude_file}
-                        If {'these samples' if len(extras)!=1 else 'this sample'} should be excluded from submissions, you can use this command:"""))
-                    for sample in extras:
-                        print(f"echo '{sample}' >> '{self.exclude_file}'")
-                    warn("")
+                        If {'these samples' if len(bc_extras)!=1 else 'this sample'} should be excluded from submissions, you can use this command:""")
+                    self.verifyUnsubmittable(bc_extras, warning)
+                # seek out/warn about extra samples in biosample map file
+                bs_extras = set(biosample_df["sample_name"].unique()) - set(barcode_df_filtered["sample_name"].unique())
+                if len(bs_extras) > 0:
+                    warning = dedent(f"""
+                        Samples exist in BioSample file that aren't found in barcode map file:
+                        \t{bs_extras}
+                        Any sample can be skipped by writing it in a line by itself in a file called:
+                        {self.exclude_file}
+                        If {'these samples' if len(bs_extras)!=1 else 'this sample'} should be excluded from submissions, you can use this command:""")
+                    self.verifyUnsubmittable(bs_extras, warning)
             if not self.allow_submitted:
                 # ensure all samples present have not been previously submitted
                 self._ensure_new_names_only(biosample_df)
@@ -796,11 +806,10 @@ class NCBI:
     ###############  vvvv  zip_prep  vvvv  ###############
 
     def verifyUnsubmittable(self,samples_to_maybe_exclude,warning=""):
-        """Prints `warning` and recommends marking `samples_to_maybe_exclude` for exclusion if needed"""
+        """Prints `warning` and advises on how to exclude `samples_to_maybe_exclude`"""
 
         if len(samples_to_maybe_exclude) != 0:
-            logging.warning(warning)
-            self._offer_skip_option(samples_to_maybe_exclude)
+            logging.warning(warning + "\n" + self._offer_skip_option(samples_to_maybe_exclude))
             exit(1)
 
     def getAllowedSamples(self,all_samples=None):

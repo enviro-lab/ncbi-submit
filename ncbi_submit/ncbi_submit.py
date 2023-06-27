@@ -6,6 +6,7 @@ from ncbi_submit.ncbi import NCBI
 from ncbi_submit.arguments import add_arguments
 from ncbi_submit.helpers import remove_empty_file,ensure_outdir_viable
 import argparse, logging
+logging.getLogger().addHandler(logging.StreamHandler())
 
 def parse_args():
     """Parses arguments and validates a few extra things"""
