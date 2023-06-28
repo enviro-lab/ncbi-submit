@@ -133,7 +133,7 @@ class Report:
         """
 
         if not action.target_db in self.status_dicts.keys():
-            self.status_dicts[action.target_db] = {"processed-ok":[],"processing":[],"queued":[],"submitted":[],"processed-error":[]}
+            self.status_dicts[action.target_db] = {"processed-ok":[],"processing":[],"queued":[],"submitted":[],"processed-error":[],"deleted":[]}
 
     def _store_status(self,action):
         """Fills status_dict[target_db] with dict of possible status values if db present in report

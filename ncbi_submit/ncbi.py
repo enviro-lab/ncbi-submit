@@ -1512,7 +1512,7 @@ class NCBI:
         else: raise AttributeError("Must specify either `reports_dir` (in config) or `outdir` (in initiation or on command line)")
         return outdir
 
-    def default_acc_dict(self,db):
+    def default_acc_dict(self,db:Literal["bs_sra","bs","sra"]):
         """Returns the default dict based on `db`"""
         if db == "bs_sra": return {"BioSample":None,"SRA":None}
         elif db == "sra": return {"SRA":None}
