@@ -363,7 +363,8 @@ class SRA_BioSample_Submission(Submission):
             `add_sra` (bool): whether to add sra xml actions to the submission
             `update_reads` (bool): whether this submission includes any samples for which the reads are being updated (were previously submitted)
             `spuid_endings` (str | dict): SPUID suffixes to use for specified samples.
-              (as str): 'suffix1:samp1,samp2;suffix2:samp3'. Strings will be converted to the dict format.
+              (as str with ":" or ","): 'suffix1:samp1,samp2;suffix2:samp3'. Strings will be converted to the dict format.
+              (as str without ":" or ","): all samples will get the str as their suffix
               (as dict): {samp1:suffix1,samp2:suffix1,samp3:suffix2}
             `biosample_df` (DataFrame): df containing final data for biosample_df submission
             `sra_df` (DataFrame): df containing final data for sra_df submission
@@ -391,7 +392,8 @@ class SRA_BioSample_Submission(Submission):
 
         Args:
             `spuid_endings` (str | dict): SPUID suffixes to use for specified samples.
-              (as str): 'suffix1:samp1,samp2;suffix2:samp3'. Strings will be converted to the dict format.
+              (as str with ":" or ","): 'suffix1:samp1,samp2;suffix2:samp3'. Strings will be converted to the dict format.
+              (as str without ":" or ","): all samples will get the str as their suffix
               (as dict): {samp1:suffix1,samp2:suffix1,samp3:suffix2}
         """
 
@@ -401,6 +403,8 @@ class SRA_BioSample_Submission(Submission):
             return spuid_endings
         elif type(spuid_endings) is str:
             spuid_endings = spuid_endings.strip("'\"")
+            if not ":" in spuid_endings:
+                return spuid_endings
             endings_dict = {}
             suffix_groups = spuid_endings.split(";")
             for group in suffix_groups:
@@ -422,7 +426,7 @@ class SRA_BioSample_Submission(Submission):
 
         num = f"_{self.ncbi.attemtpt_num}" if self.ncbi.vary_spuid else ""
         # print(row["sample_name"])
-        suffix = self.spuid_endings.get(row["sample_name"],"")
+        suffix = self.spuid_endings.get(row["sample_name"],"") if type(self.spuid_endings)==dict else self.spuid_endings
         sra_link = f"""<SPUID spuid_namespace="{self.ncbi.centerAbbr}">{row["sample_name"]}_SRA{num}{suffix}</SPUID>"""
         if sra_only or (self.update_reads and row["sample_name"] in accession_dict.keys()):
             # assuming BioSamples were previously submitted, link to their accessions, not their name

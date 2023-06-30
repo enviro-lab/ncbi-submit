@@ -43,7 +43,7 @@ def add_file_prep_args(parser_file_prep:argparse.ArgumentParser):
     parser_file_prep.add_argument("--update_reads",action="store_true",
         help="Seeks previously uploaded sample accessions. XML sheets will only include the SRA action for samples that are in the metadata but have existing submissions. Other samples will have both action sections like normal.")
     parser_file_prep.add_argument("--spuid_endings",
-        help="Adds unique, explicit suffix to SPUIDs for specified samples, e.g. 'suffix1:samp1,samp2;suffix2:samp3'. Useful if updating reads from previous submissions.")
+        help="Adds unique, explicit suffix to SPUIDs for specified samples, e.g. 'suffix1:samp1,samp2;suffix2:samp3'. Useful if updating reads from previous submissions. If a single value is given, all samples will receive that suffix.")
     parser_file_prep.add_argument("-f","--report_files",type=Path,required=False,nargs="*",default=[],
         help="Path(s) to report file(s) from which to retrieve accessions. Only used if `--update_reads` is specified. If not provided, reports will be downloaded to outdir/reports_%(bioproject_accession)")
     parser_file_prep.add_argument("-d","--download_reports",action='store_true',
