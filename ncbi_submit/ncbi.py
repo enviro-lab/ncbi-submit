@@ -578,6 +578,25 @@ class NCBI:
             output += [f'echo "{sample_name}" >> {self.exclude_file}']
         return "\n".join(output)
 
+    def nameIsNotPartOfAnother(self, sample_name:str, file:Path):
+        """Returns True if `file` contains `sample_name` as a distinct unit (no leading or trailing characters except these 3: [._-])"""
+
+        before, after = file.name.split(sample_name)
+        if not before:
+            before_ok = True
+        elif before[-1] in [".","-","_"]:
+            before_ok = True
+        else:
+            before_ok = False
+        after = after.split(".")[0]
+        if not after:
+            after_ok = True
+        elif after[0] in [".","-","_"]:
+            after_ok = True
+        else:
+            after_ok = False
+        return (before_ok and after_ok)
+
     def _get_fastq_file(self,sample_name):
         """Verifies and returns single fastq file basename for SRA
         
@@ -588,7 +607,7 @@ class NCBI:
             FileNotFoundError: if single fastq file not found for `sample_name`
         """
 
-        possible_files = list(self.fastq_dir.glob(f"*{sample_name}*.fastq*"))
+        possible_files = [f for f in self.fastq_dir.glob(f"*{sample_name}*.fastq*") if self.nameIsNotPartOfAnother(sample_name,f)]
         if len(possible_files) == 1:
             file_path:Path = possible_files[0]
         elif len(possible_files) > 1:
@@ -660,14 +679,14 @@ class NCBI:
                 else:
                     try_others = True
                     primer_map_failed = True
-        if try_others == True:
-            # if no primer_map or 'Primer Scheme' column isn't found therein, use default for all samples
-            if self.primer_scheme:
-                df["Primer Scheme"] = self.primer_scheme
-            # If there's only one possible scheme in config, use it
-            elif len(self.allowed_schemes) == 1:
-                df["Primer Scheme"] = self.allowed_schemes[0]
-            else: raise AttributeError(f"'Primer Scheme' must be a field in your `seq_report` file '{self.primer_scheme}' \n or else one of the arguments `--primer_map` or `--primer_scheme` must be provided")
+            if try_others == True:
+                # if no primer_map or 'Primer Scheme' column isn't found therein, use default for all samples
+                if self.primer_scheme:
+                    df["Primer Scheme"] = self.primer_scheme
+                # If there's only one possible scheme in config, use it
+                elif len(self.allowed_schemes) == 1:
+                    df["Primer Scheme"] = self.allowed_schemes[0]
+                else: raise AttributeError(f"'Primer Scheme' must be a field in your `seq_report` file '{self.primer_scheme}' \n or else one of the arguments `--primer_map` or `--primer_scheme` must be provided")
         
         # verify primer schemes are allowed based on config
         if len(self.allowed_schemes) == 0: raise AttributeError(f"'allowed_schemes' must be specified in `config_file` '{self.config_file}'")
