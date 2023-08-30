@@ -32,7 +32,7 @@ class NCBI:
                  barcode_map=None,config=None,controls="",gisaid_log=None,
                  primer_map=None,primer_scheme=None,fasta=None,ncbiUser=None,
                  ncbiPass=None,host=None,test_dir=False,test_mode=False,
-                 use_existing=False,subdir=None,vary_spuid=False,
+                 use_existing=False,subdir=None,vary_spuid=False,update_xml=False,
                  allow_submitted=False,extra_accessions=None,suppressed_accessions=None) -> None:
         """Creates an object that can prepare, submit, and track csv/xml submission files 
 
@@ -85,7 +85,8 @@ class NCBI:
         self.primer_map = primer_map
         self.primer_scheme = primer_scheme
         self.fasta = fasta
-        self.allow_submitted=allow_submitted
+        self.allow_submitted = allow_submitted
+        self.update_xml = update_xml
 
         # vars for ftp
         possible_report_dirs = list(self.outdir.glob("*bs*_reports")) # there should only be one (most likely)
@@ -237,7 +238,7 @@ class NCBI:
         submitted = pd.read_csv(self.submitted_samples_file,header=None,names=["already_submitted"])["already_submitted"].unique()
         attempted_duplicate = df[df["sample_name"].isin(submitted)]
         if len(attempted_duplicate) > 0:
-            raise ValueError(f"The following sample(s) appear to have already been submitted.\n\n{attempted_duplicate}\n\n * To submit anyway, you can \n   * add the flag `--update_reads` if you are only updating SRA details\n     and have already suppressed the previous submission. \n   * Alternatively, you can remove the offending sample name(s) from the file \n     '{self.submitted_samples_file}'\n     or temporarily comment out the variable `submitted_samples` in the `config_file`\n     to prevent `ncbi_submit` from checking for previously-submitted samples. \n * To exclude a sample from submission, add it to \n   '{self.exclude_file}'")
+            raise ValueError(f"The following sample(s) appear to have already been submitted.\n\n{attempted_duplicate[['sample_name','sample_title']]}\n\n * To submit anyway, you can \n   * add the flag `--update_reads` if you are only updating SRA details\n     and have already suppressed the previous submission. \n   * Alternatively, you can remove the offending sample name(s) from the file \n     '{self.submitted_samples_file}'\n     or temporarily comment out the variable `submitted_samples` in the `config_file`\n     to prevent `ncbi_submit` from checking for previously-submitted samples. \n * To exclude a sample from submission, add it to \n   '{self.exclude_file}'")
 
     def _findExcludables(self):
         """Returns list of samples to exclude (if found in file `self.exclude_file`)"""
@@ -411,7 +412,7 @@ class NCBI:
                         {self.exclude_file}
                         If {'these samples' if len(bs_extras)!=1 else 'this sample'} should be excluded from submissions, you can use this command:""")
                     self.verifyUnsubmittable(bs_extras, warning)
-            if not self.allow_submitted:
+            if not self.allow_submitted or not self.update_xml:
                 # ensure all samples present have not been previously submitted
                 self._ensure_new_names_only(biosample_df)
 
@@ -1252,19 +1253,22 @@ class NCBI:
         
         # biosample/sra
         if db == "bs_sra":
-            self.upload_if_not_there("sra_biosample.xml")
-            # move to directory containing fastqs files to upload
-            os.chdir(self.fastq_dir)
-            # find and upload all (fastq) files in any column labeled "filename*"
-            sra_df = self._prep_sra_df(use_existing=True)
+            if self.update_xml:
+                self.upload(file="sra_biosample.xml",outfile="submission.xml")
+            else:
+                self.upload_if_not_there("sra_biosample.xml")
+                # move to directory containing fastqs files to upload
+                os.chdir(self.fastq_dir)
+                # find and upload all (fastq) files in any column labeled "filename*"
+                sra_df = self._prep_sra_df(use_existing=True)
 
-            fn_cols = [col for col in sra_df.columns if col.startswith("filename")]
-            for i,row in sra_df.iterrows():
-                sample_name = row["sample_name"]
-                for col in fn_cols:
-                    file = row[col]
-                    self.upload_if_not_there(file)
-                self.mark_submitted(sample_name)
+                fn_cols = [col for col in sra_df.columns if col.startswith("filename")]
+                for i,row in sra_df.iterrows():
+                    sample_name = row["sample_name"]
+                    for col in fn_cols:
+                        file = row[col]
+                        self.upload_if_not_there(file)
+                    self.mark_submitted(sample_name)
 
         self.mark_submit_ready()
 

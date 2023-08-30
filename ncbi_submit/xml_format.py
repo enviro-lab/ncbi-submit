@@ -456,7 +456,7 @@ class SRA_BioSample_Submission(Submission):
             acc_df = self.ncbi.sra_bs_accessions_df[["sample_name","BioSample"]]
             acc_df = acc_df[acc_df["sample_name"].isin(self.ncbi.sra["df"]["sample_name"])]
             accession_dict = dict(zip(acc_df["sample_name"],acc_df["BioSample"]))
-            if len(accession_dict)==0: raise AttributeError(f"No previously-submitted BioSample accessions found but the flag --update_reads was used. \nTo specify reports with those accessions, use the --report_files flag. \nAccessions can also be written directly in a csv and pointed to via the variable `extra_accessions` (currently {self.ncbi.extra_accessions}) in your config file (currently {self.ncbi.config_file})")
+            if len(accession_dict)==0: raise AttributeError(f"No previously-submitted BioSample accessions found but the flag --update_reads was used. \nTo specify reports containing those accessions, use the --report_files flag. \nAccessions can also be written directly in a csv and pointed to via the variable `extra_accessions` (currently {self.ncbi.extra_accessions}) in your config file (currently {self.ncbi.config_file})")
         else: accession_dict = {}
 
         # alternate adding BioSample and SRA actions for each sample

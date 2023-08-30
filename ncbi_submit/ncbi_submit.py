@@ -25,6 +25,8 @@ def main():
     """Do NCBI submission preparation, submission, or checking, based on command line arguments"""
 
     args = parse_args()
+    # print(args.update_xml)
+    # exit(1)
 
     if args.action == "example":
         from example import file_getter
@@ -32,6 +34,9 @@ def main():
         if not args.config and not args.template: args.config,args.template=True,True
         # write files
         file_getter.get_files(outdir=args.outdir,config=args.config,template=args.template)
+    
+    elif getattr(args,"update_reads",False) and getattr(args,"update_xml",False):
+        raise AttributeError("Cannot update reads and xml at the same time. Pick one of `--update_reads` or `--update_xml`")
     
     else:
 
@@ -56,7 +61,8 @@ def main():
             test_dir = args.test_dir,
             test_mode = getattr(args,"test_mode",False),
             use_existing = getattr(args,"use_existing",None),
-            allow_submitted = getattr(args,"update_reads",None),
+            allow_submitted = getattr(args,"update_reads",False) or getattr(args,"update_xml",False),
+            update_xml = getattr(args,"update_xml",False),
             # spuid_endings = getattr(args,"spuid_endings",None),
             )
         

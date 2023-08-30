@@ -11,6 +11,7 @@
 ### Added
 * can compile all biosample accessions from lab's ftp submissions
 * can now prepare xml for read updates alongside regular submissions
+* can now resubmit xml (in case of errors in original submission)
 
 ## v0.4.6
 ### Changed

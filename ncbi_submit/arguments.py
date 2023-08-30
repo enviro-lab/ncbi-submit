@@ -48,6 +48,8 @@ def add_file_prep_args(parser_file_prep:argparse.ArgumentParser):
         help="Path(s) to report file(s) from which to retrieve accessions. Only used if `--update_reads` is specified. If not provided, reports will be downloaded to outdir/reports_%(bioproject_accession)")
     parser_file_prep.add_argument("-d","--download_reports",action='store_true',
         help="A flag to download report*.xml files from NCBI to outdir/reports_%(bioproject_accession). Only used if `--update_reads` is specified.")
+    parser_file_prep.add_argument("--update_xml",action="store_true",
+        help="Flag to only update files, not submit any reads, and allow previously submitted files to be included.")
 
 def add_common_ftp_args(parser:argparse.ArgumentParser):
     """Adds arguments to subparser that should be the same for all ftp actions"""
@@ -94,6 +96,8 @@ def add_ftp_args(parser_ftp:argparse.ArgumentParser):
         help="Path to local directory containing one compiled fastq file for each sample")
     parser_ftp_submit.add_argument("-T","--test_mode",action="store_true",
         help="Everything but the upload will happen (including signing into and navigating the ftp site). Files that would be transfered will be listed.")
+    parser_ftp_submit.add_argument("--update_xml",action="store_true",
+        help="Flag to only update files, not submit any reads, and allow previously submitted files to be included.")
     add_submit_check_ftp_args(parser_ftp_submit)
     # parser_ftp_submit.add_argument("--sra_only",action='store_true',
     #     help="Indicates that only the SRA tsv needs to be produced") #                                      (NOTE: still testing)
@@ -156,6 +160,7 @@ def add_arguments(parser:argparse.ArgumentParser):
     parser.add_argument("--log",choices=["DEBUG","WARNING","INFO"],required=False,default="",help="Sets logging level.")
     subparsers = parser.add_subparsers(
         help="Prepare NCBI submission TSVs or submit to NCBI using one of these actions",dest="action")
+
     parser_file_prep = subparsers.add_parser("file_prep",formatter_class=argparse.RawTextHelpFormatter,
         help=textwrap.dedent("""\
         Create NCBI-style submission TSVs by combining 
