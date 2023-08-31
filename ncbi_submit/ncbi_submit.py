@@ -8,6 +8,8 @@ from ncbi_submit.helpers import remove_empty_file,ensure_outdir_viable
 import argparse, logging
 
 def parse_args():
+    """Parses arguments and validates a few extra things"""
+
     p = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
     add_arguments(p)
     args = p.parse_args()
@@ -19,6 +21,8 @@ def parse_args():
     return args
 
 def main():
+    """Do NCBI submission preparation, submission, or checking, based on command line arguments"""
+
     args = parse_args()
 
     if args.action == "example":
@@ -37,7 +41,7 @@ def main():
             fastq_dir = getattr(args,"fastq_dir",None),
             seq_report = getattr(args,"seq_report",None),
             barcode_map = getattr(args,"barcode_map",None),
-            plate = args.plate,
+            plate = getattr(args,"plate",None),
             subdir = getattr(args,"subdir",None),
             outdir = args.outdir,
             config = args.config,
@@ -51,28 +55,39 @@ def main():
             test_dir = args.test_dir,
             test_mode = getattr(args,"test_mode",False),
             use_existing = getattr(args,"use_existing",None),
+            allow_submitted = getattr(args,"update_reads",None),
+            # spuid_endings = getattr(args,"spuid_endings",None),
             )
+        
+        report_files=getattr(args,"report_files",[]) or []
 
         if args.action == "file_prep":
             print("Preparing data")
 
-            ncbi.write_presubmission_metadata()
+            ncbi.write_presubmission_metadata(update_reads=args.update_reads,spuid_endings=args.spuid_endings,report_files=report_files,download_reports=args.download_reports)
 
             if args.prep_genbank:
                 ncbi.write_genbank_submission_zip()
 
         elif args.action == "ftp":
 
-            if args.submit:
+            # print(args)
+            # exit(1)
+
+            if args.ftp_action == "submit":
                 print(f"Submitting to {args.db}")
                 ncbi.submit(db=args.db,attempt_num=args.attempt_num)
 
-            if args.check:
+            elif args.ftp_action == "check":
                 print(f"Checking {args.db}")
                 ncbi.check(db=args.db,attempt_num=args.attempt_num,simple=args.simple)
 
+            elif args.ftp_action == "get-accessions":
+                print(f"Getting accessions for all reports from {args.db}")
+                ncbi.get_all_accessions(db=args.db,report_files=report_files,download_reports=args.download_reports)
+
         elif args.action == "example":
-            from example import examples
+            from example import file_getter
             file_getter.get_files(outdir=args.outdir,config=args.config,template=args.template)
             
     # remove logfile if not used

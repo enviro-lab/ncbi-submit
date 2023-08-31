@@ -5,6 +5,7 @@
 from xml.dom import minidom
 import io
 import re
+from typing import Literal
 
 
 class ActionReader:
@@ -14,9 +15,9 @@ class ActionReader:
         """Create an object to store and easily parse details about an action
 
         Args:
-            submission_id (_type_): id of associated submission
-            submission_status (str): status of this action: "processed-ok","processing","queued","submitted","processed-error"
-            action (str): the xml associated with the action
+            `submission_id` (_type_): id of associated submission
+            `submission_status` (str): status of this action: "processed-ok","processing","queued","submitted","processed-error"
+            `action` (str): the xml associated with the action
         """
 
         self.submission_id = submission_id
@@ -26,16 +27,26 @@ class ActionReader:
         self.sample_name = self._getSampleName()
         self.status = self._getStatus()
         self.error_source = self._locateError()
+        self.bioproject_id = self._get_bioproject_id() if self.submission_status == "submitted" else None
         self.biosample = self._getBioSample()
+        self.sra = self._getSra()
 
     def __str__(self) -> str:
         """str representation of action"""
 
         if self.biosample:
-            return f"Action ({self.sample_name}: db='{self.target_db}' status='{self.status}' acc='{self.biosample}')"
+            return f"Action ({self.sample_name}: db='{self.target_db}' status='{self.status}' bs_acc='{self.biosample}')"
         else:
             return f"Action ({self.sample_name}: db='{self.target_db}' status='{self.status}')"
-        
+    
+    def _get_bioproject_id(self):
+        """Get the bioproject id associated with this action"""
+
+        meta_node = self.action.getElementsByTagName("Meta")
+        if len(meta_node) > 0: return meta_node[0].getAttribute("BioProject")
+        # return self.action.getElementsByTagName("Meta")[0].getAttribute("BioProject")
+
+
     def _getStatus(self):
         """Returns status of action (from Response tag, which is always present)"""
 
@@ -64,20 +75,28 @@ class ActionReader:
         if self.target_db != "BioSample": return None
         return self.action.getElementsByTagName("Object")[0].getAttribute("accession")
 
-    def getIsolate(self):
-        """Returns isolate name of sample"""
+    def _getSra(self):
+        """Returns SRA accession if db is SRA"""
+
+        if self.target_db != "SRA": return None
+        object_node = self.action.getElementsByTagName("Object")
+        if len(object_node)==0:
+            return None
+        return object_node[0].getAttribute("accession")
+
+    def getIsolate(self,ignore_failure=False):
+        """Returns isolate name of sample
         
-        iso = self.action.getElementsByTagName("Isolate")[0].toxml()
+        Args:
+            `ignore_failure` (bool): Whether to ignore cases where the isolate can be found or else raise an exception
+        """
+        
+        iso_node = self.action.getElementsByTagName("Isolate")
+        if len(iso_node) == 0:
+            if ignore_failure: return None
+        iso = iso_node[0].toxml()
         tagless = re.sub('<[^<]+>', "", iso)
         return tagless
-        # # print(iso.toxml())
-        # print()
-        # # print(self.action.getElementsByTagName("Meta")[0].getElementsByTagName("Isolate")[0])
-        # # print(type(self.action.getElementsByTagName("Meta")[0].getElementsByTagName("Isolate")[0]))
-        # print(dir(self.action.getElementsByTagName("Isolate")[0]))
-        # exit(1)
-        # print(self.action.getElementsByTagName("Isolate"))
-        # return self.action.getElementsByTagName("Isolate")[0] #[0].getAttribute("Isolate")
 
 class Report:
     """Stores/retrieves information about a submission report and it's actions"""
@@ -86,7 +105,7 @@ class Report:
         """Create an object to store and parse details about a report*.xml file 
 
         Args:
-            report_file (str | Path): path to a report*.xml file
+            `report_file` (str | Path): path to a report*.xml file
         """
 
         self.report_file = report_file
@@ -109,21 +128,17 @@ class Report:
         """Creates initial dict with empty lists for target_db, if not yet made
 
         Args:
-            action (Action): an object holding an individual action's details
+            `action` (Action): an object holding an individual action's details
         """
 
         if not action.target_db in self.status_dicts.keys():
-            # print(f"adding self.status_dicts[{action.target_db}]")
             self.status_dicts[action.target_db] = {"processed-ok":[],"processing":[],"queued":[],"submitted":[],"processed-error":[]}
-        # print(action.target_db)
-        # print(self.status_dicts)
-        # print(self.status_dicts[action.target_db])
 
     def _store_status(self,action):
         """Fills status_dict[target_db] with dict of possible status values if db present in report
 
         Args:
-            action (Action): the action object to collect status info on
+            `action` (Action): the action object to collect status info on
         """
 
         self._prep_status_dict_if_needed(action)
@@ -148,7 +163,11 @@ class Report:
         return self.submission_status
 
     def statusReport(self,test_dir=False):
-        """Returns listed report on numbers of samples of each status and lists failed samples"""
+        """Returns listed report on numbers of samples of each status and lists failed samples
+
+        Args:
+            `test_dir` (bool): Whether this report is for a test submission. Defaults to False.
+        """
 
         report = []
         for db,status_dict in self.status_dicts.items():
@@ -177,34 +196,84 @@ class Report:
                     report.append(' and may be indicative of a successful submission.')
         return report
 
-    def biosamplesOk(self) -> bool:
-        """Returns True if (completed samples exist & BioSamples failed or are still processing), else False"""
-
-        if not "BioSample" in self.status_dicts.keys():
-            return False
-        bs_ok = len(self.status_dicts["BioSample"]["processed-ok"])
-        bs_fails = len(self.status_dicts["BioSample"]["processed-error"])
-        bs_processing = len(self.status_dicts["BioSample"]["processing"])
-        bs_submitted = len(self.status_dicts["BioSample"]["submitted"])
-        return sum((bs_fails,bs_processing,bs_submitted)) == 0 and bs_ok > 0
-
-    def getAccessionDict(self,by_sample_name=False) -> dict:
-        """Returns a dict of sample -> biosample_accession
-
+    def submissionComplete(self,db) -> bool:
+        """Returns True if (completed samples exist & SRA submissions failed or are still processing), else False
+        
         Args:
-            by_sample_name (bool, optional): A flag to use sample_name as dict key. Defaults to False.
-                ``True``: key: 'sample_name'
-                ``False``: key: 'isolate'
-
-        Raises:
-            Exception: warns if trying to create accession dict when not allowed
+            `db` (str): db to check. Options: [SRA,BioSample,(TODO: GenBank)]
         """
 
-        # if not self.accession_dict:
-        if not self.biosamplesOk(): raise Exception("all BioSamples must have been successfully submitted to get accession_dict")
+        if not db in self.status_dicts.keys():
+            return False
+        bs_ok = len(self.status_dicts[db]["processed-ok"])
+        bs_fails = len(self.status_dicts[db]["processed-error"])
+        bs_processing = len(self.status_dicts[db]["processing"])
+        bs_submitted = len(self.status_dicts[db]["submitted"])
+        return sum((bs_fails,bs_processing,bs_submitted)) == 0 and bs_ok > 0
+
+    # def getBiosampleAccessionDict(self,by_sample_name=False,ignore_failure=False) -> dict:
+    #     """Returns a dict of sample -> biosample_accession
+
+    #     Args:
+    #         `by_sample_name` (bool, optional): A flag to use sample_name as dict key. Defaults to False.
+    #             ``True``: key: 'sample_name'
+    #             ``False``: key: 'isolate'
+    #         `ignore_failure` (bool, optional): A flag to ignore failed samples. Defaults to False.
+
+    #     Raises:
+    #         Exception: warns if trying to create accession dict when submission is incomplete
+    #     """
+
+    #     if not ignore_failure and not self.submissionComplete("BioSample"):
+    #         raise Exception("all BioSamples must have been successfully submitted to get accession_dict. To get accessions anyway, use the `ignore_failure` flag.")
+    #     if by_sample_name == False:
+    #         self.accession_dict = {action.getIsolate():action.biosample for action in self.biosample_actions.values()}
+    #     else:
+    #         self.accession_dict = {sample_name:action.biosample for sample_name,action in self.biosample_actions.items()}
+    #     return self.accession_dict
+
+    # def getSraAccessionDict(self,by_sample_name=False,ignore_failure=False) -> dict:
+    #     """Returns a dict of sample -> sra_accession
+
+    #     Args:
+    #         `by_sample_name` (bool, optional): A flag to use sample_name as dict key. Defaults to False.
+    #             ``True``: key: 'sample_name'
+    #             ``False``: key: 'isolate'
+    #         `ignore_failure` (bool, optional): A flag to ignore failed samples. Defaults to False.
+
+    #     Raises:
+    #         Exception: warns if trying to create accession dict when submission is incomplete
+    #     """
+
+    #     if not ignore_failure and not self.submissionComplete("SRA"):
+    #         raise Exception("all SRA samples must have been successfully submitted to get accession_dict. To get accessions anyway, use the `ignore_failure` flag.")
+    #     if by_sample_name == False:
+    #         self.accession_dict = {action.getIsolate():action.sra for action in self.sra_actions.values()}
+    #     else:
+    #         self.accession_dict = {sample_name:action.sra for sample_name,action in self.sra_actions.items()}
+    #     return self.accession_dict
+
+    def getAccessionDict(self,db:Literal["SRA","BioSample"],by_sample_name=False,ignore_failure=False) -> dict:
+        """Returns a dict of sample -> sra_accession
+
+        Args:
+            `db` (str): db to check. Options: [SRA,BioSample]
+            `by_sample_name` (bool, optional): A flag to use sample_name as dict key. Defaults to False.
+                ``True``: key: 'sample_name'
+                ``False``: key: 'isolate'
+            `ignore_failure` (bool, optional): A flag to ignore failed samples. Defaults to False.
+
+        Raises:
+            Exception: warns if trying to create accession dict when submission is incomplete
+        """
+        # TODO: add GenBank?
+        if not self.submissionComplete(db) and not ignore_failure:
+            raise Exception(f"all {db} samples must have been successfully submitted to get accession_dict. To get accessions anyway, use the `ignore_failure` flag.")
+        db_lower = db.lower()
+        if db_lower == "sra": # can't get isolate from here
+            by_sample_name = True
         if by_sample_name == False:
-            self.accession_dict = {action.getIsolate():action.biosample for sample_name,action in self.biosample_actions.items()}
+            self.accession_dict = {action.getIsolate(ignore_failure=ignore_failure):getattr(action,db_lower) for action in getattr(self,f"{db_lower}_actions").values()}
         else:
-            self.accession_dict = {sample_name:action.biosample for sample_name,action in self.biosample_actions.items()}
+            self.accession_dict = {sample_name:getattr(action,db_lower,None) for sample_name,action in getattr(self,f"{db_lower}_actions").items()}
         return self.accession_dict
- 

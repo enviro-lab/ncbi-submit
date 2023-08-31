@@ -6,8 +6,10 @@
 # Note: To use the 'upload' functionality of this file, you must:
 #   $ pipenv install twine --dev
 
+from configparser import ConfigParser
 import io
 import os
+from pathlib import Path
 import sys
 from shutil import rmtree
 from setuptools import find_packages, setup, Command
@@ -17,7 +19,20 @@ from pathlib import Path
 def clean(s):
     return s.strip().strip("'\"")
 
+def clean(s):
+    return s.strip().strip("'\"")
+
 # Package meta-data.
+<<<<<<< HEAD
+=======
+# NAME = 'ncbi-submit'
+# DESCRIPTION = 'A tool for submitting to NCBI (SRA, BioSample, & GenBank).'
+# URL = 'https://github.com/enviro-lab/ncbi_interact'
+# EMAIL = 'skunklem@uncc.edu'
+# AUTHOR = 'Sam Kunkleman'
+# REQUIRES_PYTHON = '>=3.8'
+# VERSION = ''
+>>>>>>> ed450ef62c4e18b969e601f60621894e67ab6b7e
 toml = Path(__file__).resolve().parent/"pyproject.toml"
 config = ConfigParser(converters={
     'list': lambda x: [clean(i) for i in x.strip('[]').split(',')],
@@ -34,6 +49,13 @@ VERSION = config.getclean("tool.poetry","version")
 LICENSE = config.getclean("tool.poetry","license")
 
 # What packages are required for this module to be executed?
+<<<<<<< HEAD
+=======
+# REQUIRED = [
+#     'biopython',
+#     'pandas',
+# ]
+>>>>>>> ed450ef62c4e18b969e601f60621894e67ab6b7e
 REQUIRED = [f"{k}{clean(v)}" for k,v in config["tool.poetry.dependencies"].items() if "python" not in k]
 
 # What packages are optional?
@@ -114,9 +136,17 @@ setup(
     author_email=EMAIL,
     python_requires=REQUIRES_PYTHON,
     url=URL,
+<<<<<<< HEAD
     packages=find_packages(
         # exclude=["tests", "*.tests", "*.tests.*", "tests.*"]
     ),
+=======
+    # packages=find_packages(exclude=["ncbi_submit", "example"]),
+    packages=find_packages(
+        # exclude=["tests", "*.tests", "*.tests.*", "tests.*"]
+    ),
+    # packages=find_packages(exclude=["tests", "*.tests", "*.tests.*", "tests.*"]),
+>>>>>>> ed450ef62c4e18b969e601f60621894e67ab6b7e
     # If your package is a single module, use this instead of 'packages':
     # py_modules=['ncbi_submit'],
 
