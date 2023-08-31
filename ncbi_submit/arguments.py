@@ -43,11 +43,13 @@ def add_file_prep_args(parser_file_prep:argparse.ArgumentParser):
     parser_file_prep.add_argument("--update_reads",action="store_true",
         help="Seeks previously uploaded sample accessions. XML sheets will only include the SRA action for samples that are in the metadata but have existing submissions. Other samples will have both action sections like normal.")
     parser_file_prep.add_argument("--spuid_endings",
-        help="Adds unique, explicit suffix to SPUIDs for specified samples, e.g. 'suffix1:samp1,samp2;suffix2:samp3'. Useful if updating reads from previous submissions.")
+        help="Adds unique, explicit suffix to SPUIDs for specified samples, e.g. 'suffix1:samp1,samp2;suffix2:samp3'. Useful if updating reads from previous submissions. If a single value is given, all samples will receive that suffix.")
     parser_file_prep.add_argument("-f","--report_files",type=Path,required=False,nargs="*",default=[],
         help="Path(s) to report file(s) from which to retrieve accessions. Only used if `--update_reads` is specified. If not provided, reports will be downloaded to outdir/reports_%(bioproject_accession)")
     parser_file_prep.add_argument("-d","--download_reports",action='store_true',
         help="A flag to download report*.xml files from NCBI to outdir/reports_%(bioproject_accession). Only used if `--update_reads` is specified.")
+    parser_file_prep.add_argument("--update_xml",action="store_true",
+        help="Flag to only update files, not submit any reads, and allow previously submitted files to be included.")
 
 def add_common_ftp_args(parser:argparse.ArgumentParser):
     """Adds arguments to subparser that should be the same for all ftp actions"""
@@ -94,6 +96,8 @@ def add_ftp_args(parser_ftp:argparse.ArgumentParser):
         help="Path to local directory containing one compiled fastq file for each sample")
     parser_ftp_submit.add_argument("-T","--test_mode",action="store_true",
         help="Everything but the upload will happen (including signing into and navigating the ftp site). Files that would be transfered will be listed.")
+    parser_ftp_submit.add_argument("--update_xml",action="store_true",
+        help="Flag to only update files, not submit any reads, and allow previously submitted files to be included.")
     add_submit_check_ftp_args(parser_ftp_submit)
     # parser_ftp_submit.add_argument("--sra_only",action='store_true',
     #     help="Indicates that only the SRA tsv needs to be produced") #                                      (NOTE: still testing)
@@ -156,6 +160,7 @@ def add_arguments(parser:argparse.ArgumentParser):
     parser.add_argument("--log",choices=["DEBUG","WARNING","INFO"],required=False,default="",help="Sets logging level.")
     subparsers = parser.add_subparsers(
         help="Prepare NCBI submission TSVs or submit to NCBI using one of these actions",dest="action")
+
     parser_file_prep = subparsers.add_parser("file_prep",formatter_class=argparse.RawTextHelpFormatter,
         help=textwrap.dedent("""\
         Create NCBI-style submission TSVs by combining 

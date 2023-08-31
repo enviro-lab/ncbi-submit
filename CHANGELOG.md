@@ -7,9 +7,11 @@
 * example files can be produced
 * ftp now has subparsers for check/submit rather than --check/--submit arguments
 * fixed bug filling empty bs attributes with bp accession
+* handles sample names contained in other sample names - assumes name will always be separated from the rest of the filename by one of ".", "-", "_"
 ### Added
 * can compile all biosample accessions from lab's ftp submissions
 * can now prepare xml for read updates alongside regular submissions
+* can now resubmit xml (in case of errors in original submission)
 
 ## v0.4.6
 ### Changed

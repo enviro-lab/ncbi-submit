@@ -6,6 +6,7 @@ from ncbi_submit.ncbi import NCBI
 from ncbi_submit.arguments import add_arguments
 from ncbi_submit.helpers import remove_empty_file,ensure_outdir_viable
 import argparse, logging
+logging.getLogger().addHandler(logging.StreamHandler())
 
 def parse_args():
     """Parses arguments and validates a few extra things"""
@@ -24,6 +25,8 @@ def main():
     """Do NCBI submission preparation, submission, or checking, based on command line arguments"""
 
     args = parse_args()
+    # print(args.update_xml)
+    # exit(1)
 
     if args.action == "example":
         from example import file_getter
@@ -31,7 +34,7 @@ def main():
         if not args.config and not args.template: args.config,args.template=True,True
         # write files
         file_getter.get_files(outdir=args.outdir,config=args.config,template=args.template)
-    
+
     else:
 
         logging.info("args:")
@@ -55,7 +58,8 @@ def main():
             test_dir = args.test_dir,
             test_mode = getattr(args,"test_mode",False),
             use_existing = getattr(args,"use_existing",None),
-            allow_submitted = getattr(args,"update_reads",None),
+            allow_submitted = getattr(args,"update_reads",False) or getattr(args,"update_xml",False),
+            update_xml = getattr(args,"update_xml",False),
             # spuid_endings = getattr(args,"spuid_endings",None),
             )
         

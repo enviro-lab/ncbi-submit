@@ -362,7 +362,8 @@ class SRA_BioSample_Submission(Submission):
             `add_sra` (bool): whether to add sra xml actions to the submission
             `update_reads` (bool): whether this submission includes any samples for which the reads are being updated (were previously submitted)
             `spuid_endings` (str | dict): SPUID suffixes to use for specified samples.
-              (as str): 'suffix1:samp1,samp2;suffix2:samp3'. Strings will be converted to the dict format.
+              (as str with ":" or ","): 'suffix1:samp1,samp2;suffix2:samp3'. Strings will be converted to the dict format.
+              (as str without ":" or ","): all samples will get the str as their suffix
               (as dict): {samp1:suffix1,samp2:suffix1,samp3:suffix2}
             `biosample_df` (DataFrame): df containing final data for biosample_df submission
             `sra_df` (DataFrame): df containing final data for sra_df submission
@@ -390,7 +391,8 @@ class SRA_BioSample_Submission(Submission):
 
         Args:
             `spuid_endings` (str | dict): SPUID suffixes to use for specified samples.
-              (as str): 'suffix1:samp1,samp2;suffix2:samp3'. Strings will be converted to the dict format.
+              (as str with ":" or ","): 'suffix1:samp1,samp2;suffix2:samp3'. Strings will be converted to the dict format.
+              (as str without ":" or ","): all samples will get the str as their suffix
               (as dict): {samp1:suffix1,samp2:suffix1,samp3:suffix2}
         """
 
@@ -400,6 +402,8 @@ class SRA_BioSample_Submission(Submission):
             return spuid_endings
         elif type(spuid_endings) is str:
             spuid_endings = spuid_endings.strip("'\"")
+            if not ":" in spuid_endings:
+                return spuid_endings
             endings_dict = {}
             suffix_groups = spuid_endings.split(";")
             for group in suffix_groups:
@@ -421,7 +425,7 @@ class SRA_BioSample_Submission(Submission):
 
         num = f"_{self.ncbi.attemtpt_num}" if self.ncbi.vary_spuid else ""
         # print(row["sample_name"])
-        suffix = self.spuid_endings.get(row["sample_name"],"")
+        suffix = self.spuid_endings.get(row["sample_name"],"") if type(self.spuid_endings)==dict else self.spuid_endings
         sra_link = f"""<SPUID spuid_namespace="{self.ncbi.centerAbbr}">{row["sample_name"]}_SRA{num}{suffix}</SPUID>"""
         if sra_only or (self.update_reads and row["sample_name"] in accession_dict.keys()):
             # assuming BioSamples were previously submitted, link to their accessions, not their name
@@ -451,7 +455,7 @@ class SRA_BioSample_Submission(Submission):
             acc_df = self.ncbi.sra_bs_accessions_df[["sample_name","BioSample"]]
             acc_df = acc_df[acc_df["sample_name"].isin(self.ncbi.sra["df"]["sample_name"])]
             accession_dict = dict(zip(acc_df["sample_name"],acc_df["BioSample"]))
-            if len(accession_dict)==0: raise AttributeError(f"No previously-submitted BioSample accessions found but the flag --update_reads was used. \nTo specify reports with those accessions, use the --report_files flag. \nAccessions can also be written directly in a csv and pointed to via the variable `extra_accessions` (currently {self.ncbi.extra_accessions}) in your config file (currently {self.ncbi.config_file})")
+            if len(accession_dict)==0: raise AttributeError(f"No previously-submitted BioSample accessions found but the flag --update_reads was used. \nTo specify reports containing those accessions, use the --report_files flag. \nAccessions can also be written directly in a csv and pointed to via the variable `extra_accessions` (currently {self.ncbi.extra_accessions}) in your config file (currently {self.ncbi.config_file})")
         else: accession_dict = {}
 
         # alternate adding BioSample and SRA actions for each sample

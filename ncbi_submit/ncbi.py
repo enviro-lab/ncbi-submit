@@ -19,7 +19,7 @@ class NCBI:
                  barcode_map=None,config=None,controls="",gisaid_log=None,
                  primer_map=None,primer_scheme=None,fasta=None,ncbiUser=None,
                  ncbiPass=None,host=None,test_dir=False,test_mode=False,
-                 use_existing=False,subdir=None,vary_spuid=False,
+                 use_existing=False,subdir=None,vary_spuid=False,update_xml=False,
                  allow_submitted=False,extra_accessions=None,suppressed_accessions=None) -> None:
         """Creates an object that can prepare, submit, and track csv/xml submission files 
 
@@ -78,7 +78,8 @@ class NCBI:
         self.primer_map = primer_map
         self.primer_scheme = primer_scheme
         self.fasta = fasta
-        self.allow_submitted=allow_submitted
+        self.allow_submitted = allow_submitted # whether to allow previously submitted samples to be included in `file_prep`
+        self.update_xml = update_xml
 
         # vars for ftp
         possible_report_dirs = list(self.outdir.glob("*bs*_reports")) # there should only be one (most likely)
@@ -230,7 +231,7 @@ class NCBI:
         submitted = pd.read_csv(self.submitted_samples_file,header=None,names=["already_submitted"])["already_submitted"].unique()
         attempted_duplicate = df[df["sample_name"].isin(submitted)]
         if len(attempted_duplicate) > 0:
-            raise ValueError(f"The following sample(s) appear to have already been submitted.\n\n{attempted_duplicate}\n\n * To submit anyway, you can \n   * add the flag `--update_reads` if you are only updating SRA details\n     and have already suppressed the previous submission. \n   * Alternatively, you can remove the offending sample name(s) from the file \n     '{self.submitted_samples_file}'\n     or temporarily comment out the variable `submitted_samples` in the `config_file`\n     to prevent `ncbi_submit` from checking for previously-submitted samples. \n * To exclude a sample from submission, add it to \n   '{self.exclude_file}'")
+            raise ValueError(f"The following sample(s) appear to have already been submitted.\n\n{attempted_duplicate[['sample_name','sample_title']]}\n\n * To submit anyway, you can \n   * add the flag `--update_reads` if you are only updating SRA details\n     and have already suppressed the previous submission. \n   * Alternatively, you can remove the offending sample name(s) from the file \n     '{self.submitted_samples_file}'\n     or temporarily comment out the variable `submitted_samples` in the `config_file`\n     to prevent `ncbi_submit` from checking for previously-submitted samples. \n * To exclude a sample from submission, add it to \n   '{self.exclude_file}'")
 
     def _findExcludables(self):
         """Returns list of samples to exclude (if found in file `self.exclude_file`)"""
@@ -324,9 +325,10 @@ class NCBI:
                 # biosample = pd.merge(biosample,gisaid,on="sample_name_short",how='right')
                 biosample_df = pd.merge(biosample_df,self.gisaid_df,on="sample_name",how='right')
                 biosample_df = biosample_df[biosample_df["gisaid_accession"].notna()]
-                if biosample_df.isnull().values.any():
+                non_null_cols = ["collection_date","gisaid_virus_name","gisaid_accession"]
+                if biosample_df[non_null_cols].isnull().values.any():
                     print(f"\nThe gisaid data (from '{self.gisaid_log}') contains sample(s) not found in your metadata file '{self.seq_report}':")
-                    for col in biosample_df.columns:
+                    for col in non_null_cols:
                         if biosample_df[col].isna().values.any():
                             break
                     samples_missing_metadata = biosample_df[biosample_df[col].isna()]["sample_name"].tolist()
@@ -382,16 +384,26 @@ class NCBI:
             # ensure length of biosample matches length of barcodes available (excluding controls)
             if not self.barcode_df.empty:
                 barcode_df_filtered = self.barcode_df[~self.barcode_df['sample_name'].isin(self._findExcludables())]
+                # seek out/warn about extra samples in barcode map file
                 bc_extras = set(barcode_df_filtered["sample_name"].unique()) - set(biosample_df["sample_name"].unique())
                 if len(bc_extras) > 0:
-                    print("\nWARNING:\nSamples exist in barcode file that are not found in BioSample file.")
-                    print(self._offer_skip_option(bc_extras))
-                    warn("")
+                    warning = dedent(f"""
+                        Samples exist in barcode file that aren't found in BioSample file:
+                        \t{bc_extras}
+                        Any sample can be skipped by writing it in a line by itself in a file called:
+                        {self.exclude_file}
+                        If {'these samples' if len(bc_extras)!=1 else 'this sample'} should be excluded from submissions, you can use this command:""")
+                    self.verifyUnsubmittable(bc_extras, warning)
+                # seek out/warn about extra samples in biosample map file
                 bs_extras = set(biosample_df["sample_name"].unique()) - set(barcode_df_filtered["sample_name"].unique())
                 if len(bs_extras) > 0:
-                    print("\nWARNING:\nSamples exist in BioSample file that are not found in barcode file.")
-                    print(self._offer_skip_option(bs_extras))
-                    warn("")
+                    warning = dedent(f"""
+                        Samples exist in BioSample file that aren't found in barcode map file:
+                        \t{bs_extras}
+                        Any sample can be skipped by writing it in a line by itself in a file called:
+                        {self.exclude_file}
+                        If {'these samples' if len(bs_extras)!=1 else 'this sample'} should be excluded from submissions, you can use this command:""")
+                    self.verifyUnsubmittable(bs_extras, warning)
             if not self.allow_submitted:
                 # ensure all samples present have not been previously submitted
                 self._ensure_new_names_only(biosample_df)
@@ -566,6 +578,25 @@ class NCBI:
             output += [f'echo "{sample_name}" >> {self.exclude_file}']
         return "\n".join(output)
 
+    def nameIsNotPartOfAnother(self, sample_name:str, file:Path):
+        """Returns True if `file` contains `sample_name` as a distinct unit (no leading or trailing characters except these 3: [._-])"""
+
+        before, after = file.name.split(sample_name)
+        if not before:
+            before_ok = True
+        elif before[-1] in [".","-","_"]:
+            before_ok = True
+        else:
+            before_ok = False
+        after = after.split(".")[0]
+        if not after:
+            after_ok = True
+        elif after[0] in [".","-","_"]:
+            after_ok = True
+        else:
+            after_ok = False
+        return (before_ok and after_ok)
+
     def _get_fastq_file(self,sample_name):
         """Verifies and returns single fastq file basename for SRA
         
@@ -576,7 +607,7 @@ class NCBI:
             FileNotFoundError: if single fastq file not found for `sample_name`
         """
 
-        possible_files = list(self.fastq_dir.glob(f"*{sample_name}*.fastq*"))
+        possible_files = [f for f in self.fastq_dir.glob(f"*{sample_name}*.fastq*") if self.nameIsNotPartOfAnother(sample_name,f)]
         if len(possible_files) == 1:
             file_path:Path = possible_files[0]
         elif len(possible_files) > 1:
@@ -641,13 +672,11 @@ class NCBI:
                 primers = primers[["sample_name","Primer Scheme"]]
                 df = df.merge(primers,on="sample_name")
                 try_others = False
-                # primer_map_failed = False
             else: # if Primer Scheme column missing from file
                 if not self.primer_scheme:
                     raise AttributeError(f"'Primer Scheme' must be a field in the `primer_map` file '{self.primer_map}'. Alternatively, provide `primer_scheme` as an argument.")
                 else:
                     try_others = True
-                    # primer_map_failed = True
             if try_others == True:
                 # if no primer_map or 'Primer Scheme' column isn't found therein, use default for all samples
                 if self.primer_scheme:
@@ -794,12 +823,11 @@ class NCBI:
     ###############  vvvv  zip_prep  vvvv  ###############
 
     def verifyUnsubmittable(self,samples_to_maybe_exclude,warning=""):
-        """Prints `warning` and recommends marking `samples_to_maybe_exclude` for exclusion if needed"""
+        """Prints `warning` and advises on how to exclude `samples_to_maybe_exclude`"""
 
         if len(samples_to_maybe_exclude) != 0:
-            logging.warning(warning)
-            print(self._offer_skip_option(samples_to_maybe_exclude))
-            warn("")
+            logging.warning(warning + "\n" + self._offer_skip_option(samples_to_maybe_exclude))
+            exit(1)
 
     def getAllowedSamples(self,all_samples=None):
         """Returns collection of allowed samples from gisaid logfile or else all_samples
@@ -1222,20 +1250,22 @@ class NCBI:
         
         # biosample/sra
         if db == "bs_sra":
-            self.upload_if_not_there("sra_biosample.xml")
-            # move to directory containing fastqs files to upload
-            if not self.fastq_dir: raise AttributeError("`fastq_dir` is required when submitting samples")
-            os.chdir(self.fastq_dir)
-            # find and upload all (fastq) files in any column labeled "filename*"
-            sra_df = self._prep_sra_df(use_existing=True)
+            if self.update_xml:
+                self.upload(file="sra_biosample.xml",outfile="submission.xml")
+            else:
+                self.upload_if_not_there("sra_biosample.xml")
+                # move to directory containing fastqs files to upload
+                os.chdir(self.fastq_dir)
+                # find and upload all (fastq) files in any column labeled "filename*"
+                sra_df = self._prep_sra_df(use_existing=True)
 
-            fn_cols = [col for col in sra_df.columns if col.startswith("filename")]
-            for i,row in sra_df.iterrows():
-                sample_name = row["sample_name"]
-                for col in fn_cols:
-                    file = row[col]
-                    self.upload_if_not_there(file)
-                self.mark_submitted(sample_name)
+                fn_cols = [col for col in sra_df.columns if col.startswith("filename")]
+                for i,row in sra_df.iterrows():
+                    sample_name = row["sample_name"]
+                    for col in fn_cols:
+                        file = row[col]
+                        self.upload_if_not_there(file)
+                    self.mark_submitted(sample_name)
 
         self.mark_submit_ready()
 
@@ -1502,7 +1532,7 @@ class NCBI:
         else: raise AttributeError("Must specify either `reports_dir` (in config) or `outdir` (in initiation or on command line)")
         return outdir
 
-    def default_acc_dict(self,db):
+    def default_acc_dict(self,db:Literal["bs_sra","bs","sra"]):
         """Returns the default dict based on `db`"""
         if db == "bs_sra": return {"BioSample":None,"SRA":None}
         elif db == "sra": return {"SRA":None}
