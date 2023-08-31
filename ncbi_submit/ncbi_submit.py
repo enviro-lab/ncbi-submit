@@ -34,10 +34,7 @@ def main():
         if not args.config and not args.template: args.config,args.template=True,True
         # write files
         file_getter.get_files(outdir=args.outdir,config=args.config,template=args.template)
-    
-    elif getattr(args,"update_reads",False) and getattr(args,"update_xml",False):
-        raise AttributeError("Cannot update reads and xml at the same time. Pick one of `--update_reads` or `--update_xml`")
-    
+
     else:
 
         logging.info("args:")

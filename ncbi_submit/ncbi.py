@@ -85,7 +85,7 @@ class NCBI:
         self.primer_map = primer_map
         self.primer_scheme = primer_scheme
         self.fasta = fasta
-        self.allow_submitted = allow_submitted
+        self.allow_submitted = allow_submitted # whether to allow previously submitted samples to be included in `file_prep`
         self.update_xml = update_xml
 
         # vars for ftp
@@ -412,7 +412,7 @@ class NCBI:
                         {self.exclude_file}
                         If {'these samples' if len(bs_extras)!=1 else 'this sample'} should be excluded from submissions, you can use this command:""")
                     self.verifyUnsubmittable(bs_extras, warning)
-            if not self.allow_submitted or not self.update_xml:
+            if not self.allow_submitted:
                 # ensure all samples present have not been previously submitted
                 self._ensure_new_names_only(biosample_df)
 
