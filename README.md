@@ -29,7 +29,7 @@ This script ^^^ could also be a good starting point for your own NCBI submission
 ***
 ## Usage
 
-`ncbi_submit.py` is intended for use on the command line, but the class `ncbi.NCBI` can be imported and used within custom python scripts.
+`ncbi_submit` is intended for use on the command line, but the class `ncbi.NCBI` can be imported and used within custom python scripts.
 
 There are three main actions the script can do:
 * `file_prep`: 
@@ -118,8 +118,8 @@ To link your fasta in GenBank to the associated reads, you'll want to add in the
 * Acquire BioSample accessions via one of these methods:
   * download accessions.tsv file from NCBI and then use `ncbi_submit`
     * (Do this if you submitted to BioSample via NCBI's Submission Portal)
-  * use ncbi_submit.py
-    * (Do this to avoid manual uploads  via NCBI's Submission Portal)
+  * use `ncbi_submit` for everything
+    * (Do this to avoid manual uploads via NCBI's Submission Portal)
 ##### Shell:
 ```bash
 # dowload report.xml files to get accesssions from
@@ -177,7 +177,7 @@ ncbi_submit ftp check \
 ##### Python:
 ```python
 # check GenBank submission status (NOTE: db='gb')
-ncbi.check(db="gb)
+ncbi.check(db='gb')
 ```
 
 ### Download all reports and get accessions

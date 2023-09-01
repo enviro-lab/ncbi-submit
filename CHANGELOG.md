@@ -1,6 +1,8 @@
 # Change Log
 
 ## Unreleased
+* nothing yet
+
 ## v0.5.0
 ### Changed
 * readme reflects new behavior
