@@ -3,6 +3,10 @@
 ## Unreleased
 * nothing yet
 
+## v0.6.0
+### Added
+* can now submit only the samples being updated based on what appears in `spuid_endings`, with the flag `--update_only`
+
 ## v0.5.0
 ### Changed
 * readme reflects new behavior

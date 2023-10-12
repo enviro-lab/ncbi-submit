@@ -262,3 +262,12 @@ def is_fastq(file):
             if title and seq and qual:
                 return True
             else: return False
+
+def samplesFromSpuidSpecifications(spuid_endings) -> list:
+    """Parses user-suppplied spuid endings for sample names"""
+
+    samples = []
+    for grouping in spuid_endings.split(";"):
+        samples_str = grouping.split(":")[-1] if ":" in grouping else grouping
+        samples.extend(samples_str.split(","))
+    return samples

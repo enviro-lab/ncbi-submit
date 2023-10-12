@@ -961,7 +961,7 @@ class NCBI:
         xml_maker = GenBank_Submission(self)
         xml_maker.write_xml(self.genbank["xml_file"])
 
-    def write_sra_biosample_xml(self,update_reads=False,report_files=[],spuid_endings=None,download_reports=False):
+    def write_sra_biosample_xml(self,update_reads=False,report_files=[],spuid_endings=None,download_reports=False,update_only=False,updatedSamples=[]):
         """Writes out XML for SRA and/or BioSample submission
         Args:
             `update_reads` (bool, optional): If True, previously-submitted reads will be updated and linked to their associated BioSample accession. Defaults to False.
@@ -970,10 +970,10 @@ class NCBI:
             `download_reports` (bool, optional): If True and `update_reads` is True, reports will be downloaded. Defaults to False.
         """
 
-        xml_maker = SRA_BioSample_Submission(self,update_reads=update_reads,report_files=report_files,spuid_endings=spuid_endings,download_reports=download_reports)
+        xml_maker = SRA_BioSample_Submission(self,update_reads=update_reads,report_files=report_files,spuid_endings=spuid_endings,download_reports=download_reports,update_only=update_only,updatedSamples=updatedSamples)
         xml_maker.write_xml(self.sra["xml_file"])
 
-    def write_presubmission_metadata(self,sra_only=False,require_biosample=False,update_reads=False,report_files=[],spuid_endings=None,download_reports=False):
+    def write_presubmission_metadata(self,sra_only=False,require_biosample=False,update_reads=False,report_files=[],spuid_endings=None,download_reports=False,update_only=False,updatedSamples=[]):
         """Prepares TSV and XML files
 
         This should be the go-to method for preparing and writing out files for initial submission to BioSample and/or SRA
@@ -985,6 +985,7 @@ class NCBI:
             `report_files` (list|optional): files to use instead of downloading all submitted reports. Defaults to [].
             `spuid_endings` (str | dict): Maps a sample_name to a suffix to use to make the its SRA SPUID unique
             `download_reports` (bool, optional): If True and `update_reads` is True, reports will be downloaded. Defaults to False.
+            `update_only` (bool, optional): If True, only samples recieving updates will be included in metadata. Defaults to False.
             `keep_tsvs` (bool, optional): If False, TSVs will be deleted. Defaults to True. NOT CURRENTLY USED
             `keep_xmls` (bool, optional): If False, XMLs will be deleted. Defaults to True. NOT CURRENTLY USED
         """
@@ -1004,7 +1005,7 @@ class NCBI:
 
         # prepare/write XML
         print(f'Writing `sra/biosample` xml:\n   {self.sra["xml_file"]}')
-        self.write_sra_biosample_xml(update_reads=update_reads,report_files=report_files,spuid_endings=spuid_endings,download_reports=download_reports)
+        self.write_sra_biosample_xml(update_reads=update_reads,report_files=report_files,spuid_endings=spuid_endings,download_reports=download_reports,update_only=update_only,updatedSamples=updatedSamples)
 
     def write_genbank_submission_zip(self,biosample_accessions=None):
         """Prepares Zip file for GenBank submission.
@@ -1209,6 +1210,16 @@ class NCBI:
                 emptyFh.write(u"")
                 self.ftp.storbinary('STOR submit.ready', emptyFh)
 
+    def get_samples_in_submission_xml(self):
+        """Returns a list of samples found in the xml `file`"""
+
+        samples = []
+        with self.biosample["xml_file"].open() as fh:
+            for line in fh:
+                if line.strip().startswith('<Attribute name="sample_name">'):
+                    samples.append(line.split('>')[1].split("<")[0])
+        return samples
+
     def _do_submit(self,db,attempt_num=1):
         """Submits files depending on desired `db`
         
@@ -1256,9 +1267,12 @@ class NCBI:
                 self.upload_if_not_there("sra_biosample.xml")
                 # move to directory containing fastqs files to upload
                 os.chdir(self.fastq_dir)
-                # find and upload all (fastq) files in any column labeled "filename*"
+                # find all samples for which to upload fastqs 
                 sra_df = self._prep_sra_df(use_existing=True)
+                # ensure only samples included in current submission xml get uploaded
+                sra_df = sra_df[sra_df["sample_name"].isin(self.get_samples_in_submission_xml())]
 
+                # upload all (fastq) files in any column labeled "filename*"
                 fn_cols = [col for col in sra_df.columns if col.startswith("filename")]
                 for i,row in sra_df.iterrows():
                     sample_name = row["sample_name"]

@@ -353,7 +353,7 @@ class GenBank_Submission(Submission):
 class SRA_BioSample_Submission(Submission):
     """Converts SRA and BioSample TSVs to submission XML"""
 
-    def __init__(self,ncbi,add_biosample=True,add_sra=True,update_reads=False,spuid_endings=None,report_files=[],download_reports=True) -> None:
+    def __init__(self,ncbi,add_biosample=True,add_sra=True,update_reads=False,spuid_endings=None,report_files=[],download_reports=True,update_only=False,updatedSamples=[]) -> None:
         """Instantiate a Submission object
         
         Attributes:
@@ -384,6 +384,8 @@ class SRA_BioSample_Submission(Submission):
         self.add_sra = add_sra
         self.db = "bs_sra"
         self.update_reads = update_reads
+        self.update_only = update_only
+        self.updatedSamples = updatedSamples
         self.spuid_endings = self.parseSpuidEndings(spuid_endings)
 
     def parseSpuidEndings(self,spuid_endings=None):
@@ -402,8 +404,8 @@ class SRA_BioSample_Submission(Submission):
             return spuid_endings
         elif type(spuid_endings) is str:
             spuid_endings = spuid_endings.strip("'\"")
-            if not ":" in spuid_endings:
-                return spuid_endings
+            if not ":" in spuid_endings and not "," in spuid_endings:
+                return spuid_endings # this is a single string that will be appended to every spuid
             endings_dict = {}
             suffix_groups = spuid_endings.split(";")
             for group in suffix_groups:
@@ -460,6 +462,9 @@ class SRA_BioSample_Submission(Submission):
 
         # alternate adding BioSample and SRA actions for each sample
         for i,row in self.ncbi.merged["df"].iterrows():
+            if self.update_reads and self.update_only and row["sample_name"] not in self.updatedSamples:
+                # print("Skipping sample:",row["sample_name"])
+                continue
             sra_link,biosample_link = self.getSpuidOrLink(row=row, sra_only=not self.add_biosample, accession_dict=accession_dict)
             if self.add_biosample and not (self.update_reads and row["sample_name"] in accession_dict.keys()):
                 for line in BioSample_Action(

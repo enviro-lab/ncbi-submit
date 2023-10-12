@@ -4,7 +4,7 @@
 #Git Push test. 
 from ncbi_submit.ncbi import NCBI
 from ncbi_submit.arguments import add_arguments
-from ncbi_submit.helpers import remove_empty_file,ensure_outdir_viable
+from ncbi_submit.helpers import remove_empty_file,ensure_outdir_viable,samplesFromSpuidSpecifications
 import argparse, logging
 logging.getLogger().addHandler(logging.StreamHandler())
 
@@ -60,15 +60,17 @@ def main():
             use_existing = getattr(args,"use_existing",None),
             allow_submitted = getattr(args,"update_reads",False) or getattr(args,"update_xml",False),
             update_xml = getattr(args,"update_xml",False),
-            # spuid_endings = getattr(args,"spuid_endings",None),
             )
+        spuid_endings = getattr(args,"spuid_endings",None)
+        if spuid_endings: spuid_endings = spuid_endings.strip("'\"")
         
         report_files=getattr(args,"report_files",[]) or []
 
         if args.action == "file_prep":
             print("Preparing data")
-
-            ncbi.write_presubmission_metadata(update_reads=args.update_reads,spuid_endings=args.spuid_endings,report_files=report_files,download_reports=args.download_reports)
+            update_only = getattr(args,"update_only",False)
+            updatedSamples = samplesFromSpuidSpecifications(spuid_endings) if update_only else []
+            ncbi.write_presubmission_metadata(update_reads=args.update_reads,spuid_endings=spuid_endings,report_files=report_files,download_reports=args.download_reports,update_only=update_only,updatedSamples=updatedSamples)
 
             if args.prep_genbank:
                 ncbi.write_genbank_submission_zip()
