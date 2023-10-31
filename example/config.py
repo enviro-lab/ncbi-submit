@@ -87,11 +87,15 @@ bioproject["dataType"] = "genome sequencing and assembly" # if assembling
 # bioproject["dataType"] = "genome sequencing" # if not assembling
 bioproject["organism"] = "Severe acute respiratory syndrome coronavirus 2"
 bioproject["scope"] = "eMultiisolate"
+# use either number of days to hold release (int) or a specific date like ("2023-01-01")
+bioproject["hold_release"] = 0
 
 
 biosample = {}
 # REQUIRED BioSample attributes:
 # Pick the correct package and organism for your data type: https://www.ncbi.nlm.nih.gov/biosample/docs/packages/. Here are the SARS-CoV-2 options
+# use either number of days to hold release (int) or a specific date like ("2023-01-01")
+biosample["hold_release"] = 10
 biosample['package'] = "SARS-CoV-2.cl.1.0"
 biosample['organism'] = "Severe acute respiratory syndrome coronavirus 2"
 # biosample['package'] = "SARS-CoV-2.wwsurv.1.0"

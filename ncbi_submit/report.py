@@ -113,7 +113,7 @@ class Report:
         self.submission_status,self.submission_id = self._getSubmissionDetails()
         self.status_dicts = {}
         # self._createStatusDict()
-        self.sra_actions,self.biosample_actions,self.genbank_actions = {},{},{}
+        self.sra_actions,self.biosample_actions,self.genbank_actions,self.biosproject_actions = {},{},{},{}
         self.system_errors = 0 # number of sra samples where error_source=="system"
         self._addActions()
         self.accession_dict = {}
@@ -149,7 +149,7 @@ class Report:
     def _addActions(self):
         """Stores an action object (and status details) for each action in the XML report"""
 
-        action_dicts = {"SRA":self.sra_actions,"BioSample":self.biosample_actions,"GenBank":self.genbank_actions}
+        action_dicts = {"SRA":self.sra_actions,"BioSample":self.biosample_actions,"GenBank":self.genbank_actions,"bioproject":self.biosproject_actions}
         actions = self.dom.getElementsByTagName("Action")
         for xml_action in actions:
             if xml_action.getElementsByTagName("Response"):

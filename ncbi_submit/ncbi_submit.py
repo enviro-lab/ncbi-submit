@@ -3,23 +3,10 @@
 """
 #Git Push test. 
 from ncbi_submit.ncbi import NCBI
-from ncbi_submit.arguments import add_arguments
-from ncbi_submit.helpers import remove_empty_file,ensure_outdir_viable,samplesFromSpuidSpecifications
-import argparse, logging
+from ncbi_submit.arguments import parse_args
+from ncbi_submit.helpers import remove_empty_file,samplesFromSpuidSpecifications
+import logging
 logging.getLogger().addHandler(logging.StreamHandler())
-
-def parse_args():
-    """Parses arguments and validates a few extra things"""
-
-    p = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
-    add_arguments(p)
-    args = p.parse_args()
-    # set logging level, if needed
-    setattr(args,"logfile",args.outdir/'ncbi-submit.log')
-    args.logfile.parent.mkdir(exist_ok=True,parents=True)
-    args.outdir = ensure_outdir_viable(args.outdir)
-    logging.basicConfig(filename=args.logfile, encoding='utf-8', level=getattr(logging,args.log,None))
-    return args
 
 def main():
     """Do NCBI submission preparation, submission, or checking, based on command line arguments"""
@@ -39,7 +26,6 @@ def main():
 
         logging.info("args:")
         logging.info(args)
-
         ncbi = NCBI(
             fastq_dir = getattr(args,"fastq_dir",None),
             seq_report = getattr(args,"seq_report",None),

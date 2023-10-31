@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 from pathlib import Path
 import textwrap, argparse
+from ncbi_submit.helpers import ensure_outdir_viable
+import logging
+
 
 def add_file_prep_args(parser_file_prep:argparse.ArgumentParser):
     """Adds arguments for file preparation"""
-    parser_file_prep.add_argument("--fastq_dir",type=Path,required=True,
+    parser_file_prep.add_argument("--fastq_dir",type=Path,required=False,
         help="Path to directory containing one compiled fastq file for each sample")
-    parser_file_prep.add_argument("--seq_report",type=Path,required=True,
+    parser_file_prep.add_argument("--seq_report",type=Path,required=False,
         help="Path to sequencing report CSV")
-    parser_file_prep.add_argument("--plate",required=True,
+    parser_file_prep.add_argument("--plate",required=False,
         help="Unique run or plate identifier")
     parser_file_prep.add_argument("--barcode_map",type=Path,required=False,default=None,
         help="Path to barcode map TSV. Used as reference to check that all samples are accounted for.")
@@ -47,9 +50,9 @@ def add_file_prep_args(parser_file_prep:argparse.ArgumentParser):
     parser_file_prep.add_argument("--spuid_endings",
         help="Adds unique, explicit suffix to SPUIDs for specified samples, e.g. 'suffix1:samp1,samp2;suffix2:samp3'. Useful if updating reads from previous submissions. If a single value is given, all samples will receive that suffix.")
     parser_file_prep.add_argument("-f","--report_files",type=Path,required=False,nargs="*",default=[],
-        help="Path(s) to report file(s) from which to retrieve accessions. Only used if `--update_reads` is specified. If not provided, reports will be downloaded to outdir/reports_%(bioproject_accession)")
+        help="Path(s) to report file(s) from which to retrieve accessions. Only used if `--update_reads` is specified. If not provided, reports will be downloaded to outdir/reports_<bioproject_accession>")
     parser_file_prep.add_argument("-d","--download_reports",action='store_true',
-        help="A flag to download report*.xml files from NCBI to outdir/reports_%(bioproject_accession). Only used if `--update_reads` is specified.")
+        help="A flag to download report*.xml files from NCBI to outdir/reports_<bioproject_accession>. Only used if `--update_reads` is specified.")
     parser_file_prep.add_argument("--update_xml",action="store_true",
         help="Flag to only update files, not submit any reads, and allow previously submitted files to be included.")
 
@@ -72,7 +75,7 @@ def add_submit_check_ftp_args(parser:argparse.ArgumentParser):
         help="Path to output directory (default = ./ncbi)",default=Path("ncbi")),
     parser.add_argument("-s","--subdir",type=str,required=False,
         help="Prefix for remote subdirectory where files will be uploaded. `db` and `attempt_num` will be added to form the full subdirectory name. If not provided, defaults to `--plate`")
-    parser.add_argument("--plate",required=True,
+    parser.add_argument("--plate",required=False,
         help="Unique run or plate identifier")
     parser.add_argument("-c","--controls",type=str,
         help="'|'-delimited list of names used as controls (for excluding related files from upload)",default="Pos|Neg|NTC|PC|NEC")
@@ -87,14 +90,14 @@ def add_ftp_args(parser_ftp:argparse.ArgumentParser):
     parser_ftp_submit = ftp_subparsers.add_parser("submit",help="(for sra and biosample) - submits sra_biosample.xml as submission.xml, any referenced fastqs, and submit")
     add_common_ftp_args(parser_ftp_submit)
     # parser_ftp.add_argument("--submit",action="store_true",help="(for sra and biosample) - submits sra_biosample.xml as submission.xml, any referenced fastqs, and submit.ready")
-    parser_ftp_submit.add_argument("--db",choices=["bs_sra","gb"],
+    parser_ftp_submit.add_argument("--db",choices=["bs_sra","gb","bp"],
         help="The ncbi submission database which determines the submisssion files as follows:"
         "   bs_sra          * sra_biosample.xml as submission.xml"
         "   (BioSample,sra) * any referenced fastqs"
         "   gb              * genbank.zip"
         "   (GenBank)       * genbank.xml as submission.xml"
         )
-    parser_ftp_submit.add_argument("-f","--fastq_dir",type=Path,required=True,
+    parser_ftp_submit.add_argument("-f","--fastq_dir",type=Path,required=False,
         help="Path to local directory containing one compiled fastq file for each sample")
     parser_ftp_submit.add_argument("-T","--test_mode",action="store_true",
         help="Everything but the upload will happen (including signing into and navigating the ftp site). Files that would be transfered will be listed.")
@@ -106,7 +109,7 @@ def add_ftp_args(parser_ftp:argparse.ArgumentParser):
 
     parser_ftp_check = ftp_subparsers.add_parser("check",help="Reports on submission success. If no `db` specified, all will be checked")
     add_common_ftp_args(parser_ftp_check)
-    parser_ftp_check.add_argument("--db",choices=["bs_sra","gb"],
+    parser_ftp_check.add_argument("--db",choices=["bs_sra","gb","bp"],
         help="The ncbi database for which to check submission status")
     # parser_ftp.add_argument("--check",action="store_true",
     #     help="Report on submission success. If no `db` specified, all will be checked")
@@ -126,14 +129,14 @@ def add_ftp_args(parser_ftp:argparse.ArgumentParser):
 
     parser_ftp_get_accessions = ftp_subparsers.add_parser("get-accessions",help="Creates accession map from all current report files in NCBI for `db`")
     add_common_ftp_args(parser_ftp_get_accessions)
-    parser_ftp_get_accessions.add_argument("--db",choices=["bs_sra","gb"],
+    parser_ftp_get_accessions.add_argument("--db",choices=["bs_sra","gb","bp"],
         help="The ncbi database for which to download report files and retrieve accessions")
     parser_ftp_get_accessions.add_argument("-o","--outdir",type=Path,required=False,default=None,
         help="Path to output directory (default: `reports_dir` from config)")
     parser_ftp_get_accessions.add_argument("-f","--report_files",type=Path,required=False,nargs="*",
-        help="Path(s) to report file(s) from which to retrieve accessions. If not provided, reports will be downloaded to outdir/reports_%(bioproject_accession)")
+        help="Path(s) to report file(s) from which to retrieve accessions. If not provided, reports will be downloaded to outdir/reports_<bioproject_accession>")
     parser_ftp_get_accessions.add_argument("-d","--download_reports",action='store_true',
-        help="A flag to download report*.xml files from NCBI to outdir/reports_%(bioproject_accession)")
+        help="A flag to download report*.xml files from NCBI to outdir/reports_<bioproject_accession>")
     # parser_ftp.add_argument("--get-accessions",action="store_true",
     #     help="Creates accession map from all current report files in NCBI for `db`")
     
@@ -201,3 +204,35 @@ def add_arguments(parser:argparse.ArgumentParser):
     add_example_args(parser_example)
 
     return parser
+
+def check_codependent_args(args):
+    codependent_args = set()
+    if args.action == "file_prep":
+        codependent_args = set(("fastq_dir", "seq_report", "plate"))
+    elif args.action == "ftp" and args.ftp_action == "submit":
+        codependent_args = set(("fastq_dir", "plate"))
+    elif args.action == "ftp" and args.ftp_action == "check":
+        return
+
+    if codependent_args:
+        all_args = args.__dict__.keys()
+        for arg in codependent_args:
+            others = codependent_args - set([arg])
+            if arg in all_args and getattr(args,'plate') != None:
+                for other in others:
+                    if other not in all_args:
+                        raise AttributeError(f"--{arg} was provided ({getattr(args,'plate')}), so --{other} must also be provided.")
+
+def parse_args():
+    """Parses arguments and validates a few extra things"""
+
+    p = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
+    add_arguments(p)
+    args = p.parse_args()
+    # set logging level, if needed
+    setattr(args,"logfile",args.outdir/'ncbi-submit.log')
+    args.logfile.parent.mkdir(exist_ok=True,parents=True)
+    args.outdir = ensure_outdir_viable(args.outdir)
+    logging.basicConfig(filename=args.logfile, encoding='utf-8', level=getattr(logging,args.log,None))
+    check_codependent_args(args)
+    return args

@@ -85,7 +85,7 @@ class NCBI:
         possible_report_dirs = list(self.outdir.glob("*bs*_reports")) # there should only be one (most likely)
         self.report_dir = possible_report_dirs[0] if possible_report_dirs else ""
         # self.report_dir = self.outdir / "None_reports" # TODO: remove this - used only for testing flub
-        self.valid_dbs = ["sra","gb","bs_sra","bs"]
+        self.valid_dbs = ["sra","gb","bs_sra","bs","bp"]
         self.subdir = self._set_default_subdir(subdir)
         self.submit_area,self.submit_dir,self.initial_submission_dirs,self.ftp_file_sizes = self._set_ftp_vars()
         self.uploaded_something = False
@@ -284,7 +284,7 @@ class NCBI:
         # create new df
         if self.use_existing:
             logging.info("Reading in sra df - not creating it fresh")
-            biosample_df = pd.read_csv(self.biosample["tsv"],sep="\t")
+            biosample_df = pd.read_csv(self.biosample["tsv"],sep="\t",keep_default_na=False)
             actual_cols = list(biosample_df.columns)
         else:
             # ^^ return existing df or vv create anew
@@ -364,7 +364,7 @@ class NCBI:
             if self.biosample_presets["package"] == "SARS-CoV-2.cl.1.0":
                 required_bs_attr = ["sample_name","organism","collected_by","collection_date","geo_loc_name","host","host_disease","isolate","isolation_source"]
             elif self.biosample_presets["package"] == "SARS-CoV-2.wwsurv.1.0":
-                required_bs_attr = ["sample_name","organism","collected_by","collection_date","geo_loc_name","isolation_source"]
+                required_bs_attr = ["sample_name","organism","collected_by","collection_date","geo_loc_name","isolation_source","ww_population","ww_sample_duration"]
             else: # This assumes the user hasn't forgotten any necessary columns. NCBI submission will fail if important attributes are missing, anyway...
                 required_bs_attr = []
             all_bs_cols = [x.strip() for x in self.biosample_presets.get("all_cols","").split(",") if x and not x=="all_cols"]
@@ -716,11 +716,11 @@ class NCBI:
         # create new df
         if use_existing or self.use_existing:
             logging.warning("Reading in sra df - not creating it fresh")
-            sra_df = pd.read_csv(self.sra["tsv"],sep="\t")
+            sra_df = pd.read_csv(self.sra["tsv"],sep="\t",keep_default_na=False)
         else:
             # get repeated fields from BioSample
             sra_df = self._prep_biosample_df().copy()
-            cols = ['bioproject_accession','sample_name','sample_title']
+            cols = [col for col in ['bioproject_accession','sample_name','sample_title'] if col in sra_df]
             if "Primer Scheme" in sra_df.columns:
                 cols.append("Primer Scheme")
             sra_df = sra_df[cols]
@@ -791,8 +791,9 @@ class NCBI:
     def check_existing_tsvs(self):
         """Raises FileNotFoundError if TSVs don't already exist"""
 
+        required_datasets = (self.sra, self.biosample, self.genbank) if self.biosample_presets["package"] != "SARS-CoV-2.wwsurv.1.0" else (self.sra, self.biosample)
         if self.use_existing:
-            for dataset in (self.sra, self.biosample, self.genbank):
+            for dataset in required_datasets:
                 if not dataset["tsv"].exists():
                     raise FileNotFoundError(f"At least one `file_prep` TSV not found. Try again without the `use_existing` flag.")
 
@@ -993,15 +994,16 @@ class NCBI:
         ignore_dates = True if sra_only else False
 
         # prepare/write TSVs
-        self.prep_dfs(ignore_dates=ignore_dates,require_biosample=require_biosample,add_biosample=True)
+        if self.plate is not None:
+            self.prep_dfs(ignore_dates=ignore_dates,require_biosample=require_biosample,add_biosample=True)
 
-        # final_dfs = {} # NOTE: not necessary?
-        for dataset in (self.sra, self.biosample, self.genbank):
-            if dataset["df"].empty: continue
-            df_2_tsv(
-                df=finalize_df(df=dataset["df"],final_cols=dataset["final_cols"]),
-                outfile=dataset["tsv"],name=dataset["name"]
-            )
+            # final_dfs = {} # NOTE: not necessary?
+            for dataset in (self.sra, self.biosample, self.genbank):
+                if dataset["df"].empty: continue
+                df_2_tsv(
+                    df=finalize_df(df=dataset["df"],final_cols=dataset["final_cols"]),
+                    outfile=dataset["tsv"],name=dataset["name"]
+                )
 
         # prepare/write XML
         print(f'Writing `sra/biosample` xml:\n   {self.sra["xml_file"]}')
@@ -1260,26 +1262,28 @@ class NCBI:
                 self.upload_if_not_there(file)
         
         # biosample/sra
-        if db == "bs_sra":
+        if db in ["bs_sra","bp"]:
             if self.update_xml:
                 self.upload(file="sra_biosample.xml",outfile="submission.xml")
             else:
                 self.upload_if_not_there("sra_biosample.xml")
-                # move to directory containing fastqs files to upload
-                os.chdir(self.fastq_dir)
-                # find all samples for which to upload fastqs 
-                sra_df = self._prep_sra_df(use_existing=True)
-                # ensure only samples included in current submission xml get uploaded
-                sra_df = sra_df[sra_df["sample_name"].isin(self.get_samples_in_submission_xml())]
 
-                # upload all (fastq) files in any column labeled "filename*"
-                fn_cols = [col for col in sra_df.columns if col.startswith("filename")]
-                for i,row in sra_df.iterrows():
-                    sample_name = row["sample_name"]
-                    for col in fn_cols:
-                        file = row[col]
-                        self.upload_if_not_there(file)
-                    self.mark_submitted(sample_name)
+                if db == 'bs_sra': # skip if just creating bioproject
+                    # move to directory containing fastqs files to upload
+                    os.chdir(self.fastq_dir)
+                    # find all samples for which to upload fastqs 
+                    sra_df = self._prep_sra_df(use_existing=True)
+                    # ensure only samples included in current submission xml get uploaded
+                    sra_df = sra_df[sra_df["sample_name"].isin(self.get_samples_in_submission_xml())]
+
+                    # upload all (fastq) files in any column labeled "filename*"
+                    fn_cols = [col for col in sra_df.columns if col.startswith("filename")]
+                    for i,row in sra_df.iterrows():
+                        sample_name = row["sample_name"]
+                        for col in fn_cols:
+                            file = row[col]
+                            self.upload_if_not_there(file)
+                        self.mark_submitted(sample_name)
 
         self.mark_submit_ready()
 

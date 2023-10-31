@@ -294,20 +294,39 @@ class Submission(ABC):
         if self.ncbi.plate:
             return f"""<Title>{self.ncbi.plate} - {self.ncbi.biosample_presets["isolation_source"].lower()} - sars-cov-2</Title>"""
         else: return ""
+    
+    def get_comment(self):
+        """Returns comment content"""
+
+        test = "test " if self.ncbi.test_dir==True else ""
+        portions = [f"SARS-CoV-2 {test}submission -",self.ncbi.plate,self.data_type]
+        return " ".join([p for p in portions if p])
+
+    def get_release_date(self):
+        """Returns release date based on `config` settings"""
+
+        if self.db == 'bp':
+            requested_hold_date = self.ncbi.bioproject_presets.get("hold_release",None)
+        elif self.db == 'bs_sra':
+            requested_hold_date = self.ncbi.biosample_presets.get("hold_release",None)
+        elif self.db == 'gb':
+            requested_hold_date = self.ncbi.genbank_presets.get("hold_release",None)
+        
+        if type(requested_hold_date)==int:
+            release_date = (datetime.datetime.now() + datetime.timedelta(days=requested_hold_date)).strftime('%Y-%m-%d')
+        elif type(requested_hold_date)==str and len(requested_hold_date) == 10 and requested_hold_date[4]==requested_hold_date[7]=="-":
+            release_date = requested_hold_date
+        elif requested_hold_date == None:
+            release_date = datetime.datetime.now().strftime('%Y-%m-%d')
+        return release_date
 
     def xml_description(self):
         """Returns lab-specific header for any NCBI xml file"""
 
-        ## TODO: allow date specifications in `config_file`?
-        # next_week = datetime.datetime.now() + datetime.timedelta(days=7)
-        # release = next_week.strftime('%Y-%m-%d')
-        today = datetime.datetime.now()
-        release = today.strftime('%Y-%m-%d') #TODO: add this to `config_file`/parameters
-        test = "test " if self.ncbi.test_dir==True else ""
-        return indent(dedent(f"""\
+        content = indent(dedent(f"""\
             <Description>
               {self.get_title()}
-              <Comment>SARS-CoV-2 {test}submission - {self.ncbi.plate} {self.data_type}</Comment>
+              <Comment>{self.get_comment()}</Comment>
               <Organization type="center" role="owner">
                 <Name>{self.ncbi.affiliation['div']}</Name>
                 <Contact email="{self.ncbi.email}">
@@ -317,9 +336,10 @@ class Submission(ABC):
                   </Name>
                 </Contact>
               </Organization>
-              <Hold release_date="{release}"/>
+              <Hold release_date="{self.get_release_date()}"/>
             </Description>"""
         ),"  ")
+        return "\n".join([line for line in content.split("\n") if line])
     
     def generate_xml_lines(self):
         """Yields each piece of XML document"""
@@ -379,10 +399,13 @@ class SRA_BioSample_Submission(Submission):
             if not ncbi.ftp:
                 ncbi.ncbiConnect()
             ncbi._get_all_accessions("bs_sra",report_files=report_files,download_reports=download_reports)
-        super().__init__(ncbi,data_type="BS+SRA")
+        if not isinstance(ncbi.sra["df"],pd.DataFrame) and not isinstance(ncbi.biosample["df"],pd.DataFrame) and ncbi.bioproject_presets["create_new"]:
+            data_type = "BP"
+        else: data_type = "BS+SRA"
+        super().__init__(ncbi,data_type=data_type)
         self.add_biosample = add_biosample
         self.add_sra = add_sra
-        self.db = "bs_sra"
+        self.db = "bs_sra" if data_type == "BS+SRA" else "bp"
         self.update_reads = update_reads
         self.update_only = update_only
         self.updatedSamples = updatedSamples
@@ -441,8 +464,8 @@ class SRA_BioSample_Submission(Submission):
     def xml_actions(self):
         """Generates indvidual XML actions or portions of XML actions"""
 
-        sra_cols = self.ncbi.sra["final_cols"]
-        biosample_cols = self.ncbi.biosample["final_cols"]
+        sra_cols = self.ncbi.sra.get("final_cols")
+        biosample_cols = self.ncbi.biosample.get("final_cols")
 
         # TODO: test this with actual `test_dir` submission - then make sure BioProject accession can be retrieved from logs
         # create new BioProject, if requested in `config_file`
@@ -460,28 +483,36 @@ class SRA_BioSample_Submission(Submission):
             if len(accession_dict)==0: raise AttributeError(f"No previously-submitted BioSample accessions found but the flag --update_reads was used. \nTo specify reports containing those accessions, use the --report_files flag. \nAccessions can also be written directly in a csv and pointed to via the variable `extra_accessions` (currently {self.ncbi.extra_accessions}) in your config file (currently {self.ncbi.config_file})")
         else: accession_dict = {}
 
-        # alternate adding BioSample and SRA actions for each sample
-        for i,row in self.ncbi.merged["df"].iterrows():
-            if self.update_reads and self.update_only and row["sample_name"] not in self.updatedSamples:
-                # print("Skipping sample:",row["sample_name"])
-                continue
-            sra_link,biosample_link = self.getSpuidOrLink(row=row, sra_only=not self.add_biosample, accession_dict=accession_dict)
-            if self.add_biosample and not (self.update_reads and row["sample_name"] in accession_dict.keys()):
-                for line in BioSample_Action(
-                    ncbi=self.ncbi,
-                    attributes=series2dict(row,biosample_cols),
-                    biosample_link=biosample_link,
-                    ).generate_action_lines():
-                    yield line
-            if self.add_sra:
-                for line in SRA_Action(
-                    ncbi=self.ncbi,
-                    attributes=series2dict(row,sra_cols),
-                    biosample_link=biosample_link,
-                    sra_link=sra_link,
-                    accession_dict=accession_dict,
-                    ).generate_action_lines():
-                    yield line
+        if isinstance(self.ncbi.merged["df"],pd.DataFrame):
+            # alternate adding BioSample and SRA actions for each sample
+            for i,row in self.ncbi.merged["df"].iterrows():
+                if self.update_reads and self.update_only and row["sample_name"] not in self.updatedSamples:
+                    # print("Skipping sample:",row["sample_name"])
+                    continue
+                sra_link,biosample_link = self.getSpuidOrLink(row=row, sra_only=not self.add_biosample, accession_dict=accession_dict)
+                if self.add_biosample and not (self.update_reads and row["sample_name"] in accession_dict.keys()):
+                    for line in BioSample_Action(
+                        ncbi=self.ncbi,
+                        attributes=series2dict(row,biosample_cols),
+                        biosample_link=biosample_link,
+                        ).generate_action_lines():
+                        yield line
+                if self.add_sra:
+                    for line in SRA_Action(
+                        ncbi=self.ncbi,
+                        attributes=series2dict(row,sra_cols),
+                        biosample_link=biosample_link,
+                        sra_link=sra_link,
+                        accession_dict=accession_dict,
+                        ).generate_action_lines():
+                        yield line
+    def get_website_link(self):
+        if self.ncbi.bioproject_presets["url"]:
+            return indent(dedent(f'''\
+                    <ExternalLink label="Website: {self.ncbi.bioproject_presets["website_name"]}">'
+                      <URL>{self.ncbi.bioproject_presets["url"]}</URL>
+                    </ExternalLink>''',"            "))
+        else: return ""
 
     def add_BioProject_xml(self):
         """Returns xml action to create a new BioProject
@@ -489,7 +520,7 @@ class SRA_BioSample_Submission(Submission):
         
         """
         bioproject_spuid = get_bioproject_spuid(self.ncbi)
-        return indent(dedent(f"""\
+        content = indent(dedent(f"""\
         <Action>
           <AddData target_db="BioProject">
             <Data content_type="xml">
@@ -499,21 +530,24 @@ class SRA_BioSample_Submission(Submission):
                     {bioproject_spuid}
                   </ProjectID>
                   <Descriptor>
-                    <Title>{self.bioproject_presets["spuid"]}</Title>
+                    <Title>{self.ncbi.bioproject_presets["title"]}</Title>
                       <Description>
-                        <p>{self.bioproject_presets["description"]}</p>
+                        <p>{self.ncbi.bioproject_presets["description"]}</p>
                       </Description>
-                    <ExternalLink label="Website: {self.bioproject_presets["website_name"]}">
-                      <URL>{self.bioproject_presets["url"]}</URL>
-                    </ExternalLink>
+                    {self.get_website_link()}
                     <Relevance>
                       <Medical>Yes</Medical>
                     </Relevance>
                   </Descriptor>
                   <ProjectType>
-                    <ProjectTypeSubmission sample_scope="{self.bioproject_presets["scope"]}">
+                    <ProjectTypeSubmission sample_scope="{self.ncbi.bioproject_presets["scope"]}">
+                      <Organism>
+                        <OrganismName>
+                          {self.ncbi.bioproject_presets["organism"]}
+                        </OrganismName>
+                      </Organism>
                       <IntendedDataTypeSet>
-                        <DataType>{self.bioproject_presets["dataType"]}</DataType>
+                        <DataType>{self.ncbi.bioproject_presets["dataType"]}</DataType>
                       </IntendedDataTypeSet>
                     </ProjectTypeSubmission>
                   </ProjectType>
@@ -526,3 +560,4 @@ class SRA_BioSample_Submission(Submission):
           </AddData>
         </Action>"""
         ),"    ")
+        return "\n".join([line for line in content.split("\n") if line.strip()])

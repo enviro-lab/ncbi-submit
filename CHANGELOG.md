@@ -3,6 +3,12 @@
 ## Unreleased
 * nothing yet
 
+## v0.7.0
+### Added
+* can now prepare/submit BioProject portion of XML (not yet tested with biosample/sra in the same submission, but it works alone)
+### Changed
+* updated readme
+
 ## v0.6.0
 ### Added
 * can now submit only the samples being updated based on what appears in `spuid_endings`, with the flag `--update_only`

@@ -1,6 +1,30 @@
 # ncbi-submit
 Submitting data to public databases is super important for publically funded laboratories, but it is not always a quick or intuitive process. `ncbi-submit` provides a simple and repeatable way to upload programmatic submissions to NCBI's SRA and GenBank with shared or unique BioProjects and BioSamples. Data can be uploaded as XML or zip files to either the Test or Production environments, and once there, the reports produced by NCBI can be analyzed to check on submission status and get BioSample accessions.
 
+- [ncbi-submit](#ncbi-submit)
+  - [Installation:](#installation)
+  - [Testing](#testing)
+  - [Usage](#usage)
+    - [Setup](#setup)
+    - [How to create a BioProject accession](#how-to-create-a-bioproject-accession)
+    - [File Preparation](#file-preparation)
+      - [Python instantiation (not needed on command line):](#python-instantiation-not-needed-on-command-line)
+    - [File Submission](#file-submission)
+    - [GenBank submission](#genbank-submission)
+    - [Check Submission Status](#check-submission-status)
+    - [How to get accessions (BioSample, SRA)](#how-to-get-accessions-biosample-sra)
+      - [Get accessions by downloading report.xml files](#get-accessions-by-downloading-reportxml-files)
+      - [Get accessions from list of report.xml files](#get-accessions-from-list-of-reportxml-files)
+  - [Updating samples that have already been submitted](#updating-samples-that-have-already-been-submitted)
+    - [Fastq read updates](#fastq-read-updates)
+    - [Other metadata updates](#other-metadata-updates)
+  - [Input File Paths Explained](#input-file-paths-explained)
+    - [Required Files](#required-files)
+    - [Optional Files](#optional-files)
+    - [Sometimes Required Paths](#sometimes-required-paths)
+  - [Links to xml template examples/schema:](#links-to-xml-template-examplesschema)
+
+
 ***
 ## Installation:
 To install from PyPI in a virtual environment `.venv`:
@@ -51,11 +75,21 @@ There are three main actions the script can do:
 ### Setup
 The required parameters vary by which of the above actions you're attempting but at minimum require a `plate` and `outdir`. To limit the number of parameters required via command line, a `config` file must be used. When running from the command line, one of the three actions (`file_prep` or `ftp`) must be specified. With python, these are associated methods you may use on a single NCBI object.
 
-#### Get example `config.py` file:
+Run this command to get a example `config.py` file in a directory called './ncbi':
 ```bash
-ncbi_submit example --config --outdir "nbci"
+ncbi_submit example --config --outdir "./nbci"
 ```
 
+### How to create a BioProject accession
+A BioProject accession can be created in NCBI's submission portal, but it can also be created by ncbi-submit either as part of a BioSample/SRA submission or all by itself.
+
+Steps for creating a new BioProject accession via ncbi-submit:
+1. In your `config.py` file, set `bioproject['create_new'] = True`
+2. Follow the below [file preparation](#file-preparation) advice
+3. Follow the below [file submission](#file-submission) advice, but if you're only creating a BioProject and don't want to submit any other data, you can omit the --fastq_dir and --plate options and specify a --subdir instead (as the name of the directory to be used in NCBI's ftp site)
+4. Once you have results, add the new accession to your `config.py` file at `bioproject['bioproject_accession']` and set `bioproject['create_new'] = False`
+
+### File Preparation
 #### Python instantiation (not needed on command line):
 Note: This is the minimum required info for preparing data. Other parameters may be necessary for more functionality or other tasks.  
 ```python
@@ -70,8 +104,7 @@ ncbi = ncbi_submit.NCBI(
 ncbi.write_presubmission_metadata()
 ```
 
-### File Preperation
-##### Shell:
+Shell:
 ```bash
 ncbi_submit file_prep \
     --test_mode --test_dir \
@@ -84,30 +117,48 @@ ncbi_submit file_prep \
     --fastq_dir ${FASTQS} \
     --plate "${PLATE}"
 ```
-##### Python:
+Python:
 ```python
 ncbi.write_presubmission_metadata()
 ```
 
 ### File Submission
-##### Shell:
+NOTE: Once you're ready, you can drop the --test_mode and --test_dir flags
+
+Shell:
 ```bash
+# if submitting to BioSample and SRA (and if creating a new BioProject):
 ncbi_submit ftp submit \
     --db bs_sra \
     --test_mode --test_dir \
     --config "${NCBI_CONFIG}" \
     --outdir "${NCBI_DIR}" \
     --fastq_dir "${FASTQS}"
+
+# if only creating a new BioProject:
+ncbi_submit ftp submit \
+    --db 'bp' \
+    --plate \
+    --test_mode --test_dir \
+    --config "${NCBI_CONFIG}" \
+    --subdir "${NCBI_SUBDIR}" \
+    --outdir "${NCBI_DIR}" 
+
 # wait a while and try this to download reports and view submission status
-ncbi_submit ftp \
-    --check --db bs_sra \
+ncbi_submit ftp check \
+    --plate \
+    --db bs_sra \
     --test_mode --test_dir \
     --config "${NCBI_CONFIG}" \
     --outdir "${NCBI_DIR}" 
 ```
-##### Python:
+Python:
 ```python
+# if submitting to BioSample and SRA (and if creating a new BioProject):
 ncbi.submit(db="bs_sra")
+# if only creating a new BioProject:
+ncbi.submit(db="bp")
+
 # wait awhile and try this to download reports and view submission status
 ncbi.check(db="bs_sra")
 ```
@@ -120,7 +171,7 @@ To link your fasta in GenBank to the associated reads, you'll want to add in the
     * (Do this if you submitted to BioSample via NCBI's Submission Portal)
   * use `ncbi_submit` for everything
     * (Do this to avoid manual uploads via NCBI's Submission Portal)
-##### Shell:
+Shell:
 ```bash
 # dowload report.xml files to get accesssions from
 ncbi_submit ftp check \
@@ -147,7 +198,7 @@ ncbi_submit ftp submit \
     --outdir "${NCBI_DIR}" \
     --fastq_dir "${FASTQS}"
 ```
-##### Python:
+Python:
 ```python
 # dowload report.xml files to get accesssions
 ncbi.check(db="bs_sra")
@@ -165,7 +216,7 @@ ncbi.write_genbank_submission_zip()
 Wait awhile (10+ minutes) for NCBI to start processing the submission. Then run this to download reports and view submission status.
 This works for whichever db you want to check on. If not specified, you'll get results on all submitted dbs.
 
-##### Shell:
+Shell:
 ```bash
 # check GenBank submission status (NOTE: db='gb')
 ncbi_submit ftp check \
@@ -174,14 +225,14 @@ ncbi_submit ftp check \
     --config "${NCBI_CONFIG}" \
     --outdir "${NCBI_DIR}"
 ```
-##### Python:
+Python:
 ```python
 # check GenBank submission status (NOTE: db='gb')
 ncbi.check(db='gb')
 ```
 
-### Download all reports and get accessions
-To acquire the accessions for all samples submitted via ftp under your group's account, `ncbi_submit` can download all xml report files and parse out the accession details. A directory will be created in `outdir` containing all submission-specific directories, each containing its report files. The `-f` or `--files` flag allows the use of a list of report files to parse. If provided, those files will be parsed for accession details rather than downloading the latest report files. The database can be specifed to indicate which accessions are desired and yield csvs (for the BioProject associated with your current `config` file) at `<outdir>/accessions_<bioproject>.csv` with the following fields:
+### How to get accessions (BioSample, SRA)
+To acquire the accessions for all samples submitted via ftp under your group's account, `ncbi_submit` can download all xml report files and parse out the accession details. A directory will be created in `outdir` containing all submission-specific directories, each containing its report files. The `-f` or `--files` flag allows the use of a list of report files to parse. If provided, those files will be parsed for accession details rather than downloading the latest report files. NCBI only stores uploads for a certain amount of time, so accessions found in newly downloaded reports are combined with those from previously downloaded report files to get the most complete picture. This means it's important that you run `ncbi_submit ftp check` after each submission has been processed to ensure accurate results. The database can be specifed to indicate which accessions are desired and yield csvs (for the BioProject associated with your current `config` file) at `<outdir>/accessions_<bioproject>.csv` with the following fields:
 | database | fields |
 |-|-|
 | 'bs_sra' | sample_name, BioSample, SRA |
@@ -189,7 +240,7 @@ To acquire the accessions for all samples submitted via ftp under your group's a
 | 'sra' | sample_name, SRA |
 
 #### Get accessions by downloading report.xml files
-##### Shell:
+Shell:
 ```bash
 ncbi_submit ftp get-accessions \
     --db "bs_sra" \
@@ -198,13 +249,13 @@ ncbi_submit ftp get-accessions \
     -u "${ncbi_username}" \
     -p "${ncbi_password}" \
 ```
-##### Python:
+Python:
 ```python
-ncbi.get_all_accessions(db="bs_sra)
+ncbi.get_all_accessions(db="bs_sra")
 ```
 
 #### Get accessions from list of report.xml files
-##### Shell:
+Shell:
 ```bash
 ncbi_submit ftp get-accessions \
     --db "bs_sra" \
@@ -214,7 +265,7 @@ ncbi_submit ftp get-accessions \
     -p "${ncbi_password}" \
     -f s1/report.xml s2/report.xml
 ```
-##### Python:
+Python:
 ```python
 ncbi.get_all_accessions(db="bs_sra",report_files=["file1", "file2"])
 ```
@@ -233,7 +284,7 @@ The `submission.xml` can be prepared as shown below and then submitted as discus
 ### Other metadata updates
 These are not currently supported but could be added in the future if they seem important/useful.
 
-##### Shell:
+Shell:
 ```bash
 ncbi_submit file_prep \
     --config "${NCBI_CONFIG}" \
@@ -244,14 +295,14 @@ ncbi_submit file_prep \
     --update_reads \
     --spuid_endings 'suffix1:samp1,samp2;suffix2:samp3'
 ```
-##### Python:
+Python:
 ```python
 ncbi.write_presubmission_metadata(update_reads=True,spuid_endings={"sample1":"suffix1", "sample2":"suffix1", "sample3":"suffix2"})
 ```
 
 ***
-## Input Paths
-### Required Files:
+## Input File Paths Explained
+### Required Files
   * `config`: Contains preset values and details about your lab, team, and submission plans that are necessary for submission.
   * `seq_report`: Main metadata file with sample details - can be equivalent to NCBI's BioSample TSV for use with the Submission Portal.
 ### Optional Files
