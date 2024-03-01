@@ -114,13 +114,13 @@ class SRA_BioSample_Action(Action):
             # link to known BioProject
             return f'<PrimaryId db="BioProject">{accession}</PrimaryId>'
 
-    def reference_bioproject(self): # this could be replaced by a function that only links biosample if not creating it as a seperate Action step
+    def reference_bioproject(self,accession=None): # this could be replaced by a function that only links biosample if not creating it as a seperate Action step
         """Returns xml text for referencing BioProject accession"""
 
         return dedent(f"""\
         <AttributeRefId name="BioProject">
           <RefId>
-            {self.get_bioproject_link()}
+            {self.get_bioproject_link(accession)}
           </RefId>
         </AttributeRefId>""")
 
@@ -184,7 +184,8 @@ class SRA_Action(SRA_BioSample_Action):
         for attribute in self.generate_xml_attributes():
             yield indent(attribute,"      ")
         # self.generate_xml_attributes(row,db="sra",blankspace="      ").lstrip()
-        yield indent(f"""{self.reference_bioproject()}""",(4+self.indent_by)*" ")
+        row_acc = self.attributes.get("bioproject_accession")
+        yield indent(f"""{self.reference_bioproject(accession=row_acc)}""",(4+self.indent_by)*" ")
         yield indent(self.link_bioSample(self.biosample_link),(4+self.indent_by)*" ")
         yield indent(dedent(f"""\
                 <Identifier>

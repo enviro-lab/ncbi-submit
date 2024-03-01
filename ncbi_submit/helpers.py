@@ -27,6 +27,7 @@ class DataHolder():
 
 def warn(message):
     """Prints a message and exits the script with a failing return code"""
+    print(f"\nWARNING:\n")
     print(message)
     exit(1)
 
@@ -43,7 +44,8 @@ def getConfig(config_file=None):
             "`--ncbi_config` file must be provided")
     # add config vars to `config` dict and return
     config = {}
-    logging.info("reading config:")
+    logging.info("reading config:",config_file)
+    print("reading config:",config_file)
     exec(io.open(config_file).read(), config)
     return {k:v for k,v in config.items() if k!='__builtins__'}, config_file
 

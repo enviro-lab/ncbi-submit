@@ -60,12 +60,12 @@ class NCBI:
         self.sra_bs_accessions_df = pd.DataFrame()
         self.extra_accessions = extra_accessions or cf.get("extra_accessions",None)
         self.suppressed_accessions = suppressed_accessions or cf.get("suppressed_accessions",None)
+        self.fastq_finder = cf.get("sample_rename_to_find_fastqs",None)
 
         # varify files exist if provided
         for name,path in {"fastq_dir":fastq_dir,"seq_report":seq_report,"barcode_map":barcode_map,"gisaid_log":gisaid_log,"primer_map":primer_map,"fasta":fasta}.items():
             if path and not Path(path).exists():
-                print(f"The provided file does not exist:\n{name}: {path}")
-                warn("")
+                warn(f"The provided file does not exist:\n{name}: {path}")
 
         # set plate-specific details
         self.fastq_dir = Path(fastq_dir) if fastq_dir else None
@@ -291,7 +291,8 @@ class NCBI:
             seq_report_df = self.seq_report_df
 
             # get variables from seq_report_df and set column headers to match those in template
-            starting_cols = [x.strip() for x in self.biosample_presets.get("all_cols","").split(",") if x.strip() in seq_report_df.columns]
+            preset_all_cols = [x.strip() for x in self.biosample_presets.get("all_cols","").split(",") if x.strip()]
+            starting_cols = [x for x in preset_all_cols if x in seq_report_df.columns]
             
             # add derived attributes
             # ensure these are added to the df and list of expected columns
@@ -323,18 +324,27 @@ class NCBI:
             # merge in gisaid accessions
             if not self.gisaid_df.empty:
                 # biosample = pd.merge(biosample,gisaid,on="sample_name_short",how='right')
-                biosample_df = pd.merge(biosample_df,self.gisaid_df,on="sample_name",how='right')
-                biosample_df = biosample_df[biosample_df["gisaid_accession"].notna()]
-                non_null_cols = ["collection_date","gisaid_virus_name","gisaid_accession"]
+
+                # # if only submitting samples found in gisaid submission
+                # biosample_df = pd.merge(biosample_df,self.gisaid_df,on="sample_name",how='right')
+                # biosample_df = biosample_df[biosample_df["gisaid_accession"].notna()]
+                # non_null_cols = ["collection_date","gisaid_virus_name","gisaid_accession"]
+
+                # if submitting everything from seq_report
+                biosample_df = pd.merge(biosample_df,self.gisaid_df,on="sample_name",how='left')
+                non_null_cols = ["collection_date"]
+                biosample_df["gisaid_accession"] = biosample_df["gisaid_accession"].fillna("missing")
+                # print(biosample_df.columns)
+                # print(biosample_df)
+
                 if biosample_df[non_null_cols].isnull().values.any():
                     print(f"\nThe gisaid data (from '{self.gisaid_log}') contains sample(s) not found in your metadata file '{self.seq_report}':")
                     for col in non_null_cols:
                         if biosample_df[col].isna().values.any():
                             break
                     samples_missing_metadata = biosample_df[biosample_df[col].isna()]["sample_name"].tolist()
-                    print(samples_missing_metadata)
-                    self._offer_skip_option(samples_missing_metadata)
-                    warn("")
+                    warning_message = samples_missing_metadata + "\n" + self._offer_skip_option(samples_missing_metadata)
+                    warn(warning_message)
             else:
                 biosample_df['gisaid_accession'] = 'missing'
             if ignore_dates:
@@ -351,8 +361,11 @@ class NCBI:
             biosample_df['gisaid_accession'] = biosample_df['gisaid_accession'].apply(lambda x: x if str(x)!='nan' else 'missing')
 
             # add config defaults/overrides
-            for k,col in self.biosample_presets.items():
-                biosample_df[k] = col
+            for attr,default_value in self.biosample_presets.items():
+                if not attr in biosample_df.columns:
+                    biosample_df[attr] = default_value
+                else:
+                    biosample_df[attr] = biosample_df[attr].fillna(default_value)
 
             # use test bioproject for all samples (if --test_dir==True)
             # use default bioproject for any samples that don't have one (if --test_dir==False)
@@ -545,10 +558,11 @@ class NCBI:
             genbank_df: pd.DataFrame = self.biosample["df"].copy()[cols]
             genbank_df['biosample_accession'] = 'Missing'
             genbank_df['gisaid_accession'] = genbank_df['gisaid_accession'].apply(lambda x: 'GISAID accession: ' + str(x).strip() if str(x)!='missing' else "")
-            submittable = self.get_gisaid_submitted_samples()
-            # filter to gisaid-only
-            if not submittable=="all":
-                genbank_df = genbank_df[genbank_df["sample_name"].isin(submittable)]
+            # # NOTE: No longer submitting only samples with gisaid accessions. Use a filtered seq_report, if any samples shouldn't be submitted
+            # # submittable = self.get_gisaid_submitted_samples()
+            # # # filter to gisaid-only
+            # # if not submittable=="all":
+            # #     genbank_df = genbank_df[genbank_df["sample_name"].isin(submittable)]
             new_cols = cols + ['biosample_accession']
             genbank_df = genbank_df[new_cols]
             genbank_df = genbank_df.rename(columns={'sample_name':'Sequence_ID','geo_loc_name':'country', 'host':'host', 'isolate':'isolate', 'collection_date':'collection-date', 'isolation_source':'isolation-source', 'biosample_accession':'BioSample', 'bioproject_accession':'BioProject', 'gisaid_accession':'note'})
@@ -609,6 +623,7 @@ class NCBI:
 
         possible_files = [f for f in self.fastq_dir.glob(f"*{sample_name}*.fastq*") if self.nameIsNotPartOfAnother(sample_name,f)]
         if len(possible_files) == 1:
+            print("sample_name:",sample_name)
             file_path:Path = possible_files[0]
         elif len(possible_files) > 1:
             raise FileNotFoundError(f"Too many potential fastq files for sample '{sample_name}' in \n{self.fastq_dir}")
@@ -630,12 +645,14 @@ class NCBI:
             FileNotFoundError: if paired fastq files not found for `sample_name`
         """
 
-        possible_files:list[Path] = list(self.fastq_dir.glob(f"*{sample_name}*"))
+        if self.fastq_finder:
+            sample_name = self.fastq_finder(sample_name)
+        possible_files:list[Path] = list(self.fastq_dir.glob(f"*{sample_name}*.fastq*"))
         if len(possible_files) == 2:
             if is_fastq(possible_files[0]) and is_fastq(possible_files[1]):
                 return possible_files
         elif len(possible_files) == 0:
-            raise FileNotFoundError(f"Can't locate fastqs in {self.fastq_dir} via sample name '{sample_name}'.\n{self._offer_skip_option(sample_name)}")
+            warn(f"Can't locate fastqs in {self.fastq_dir} via sample name '{sample_name}'.\n{self._offer_skip_option([sample_name])}.\nTo specify adjustments that need to be made to each `sample_name`, edit the function `sample_rename_to_find_fastqs(sample_name)` in your config file {self.config_file}")
         elif len(possible_files) == 1:
             if is_fastq(possible_files[0]):
                 raise FileNotFoundError(f"Expected directory containing paired fastq files but found single fastq:\n\t'{possible_files[0]}'")
@@ -702,7 +719,8 @@ class NCBI:
         """
 
         if "illumina" in self.sra_presets["platform"].lower():
-            df[["filename","filename2"]] = df['sample_name'].apply(self._get_paired_fastq_files,result_type="expand")
+            # df[["filename","filename2"]] = df['sample_name'].apply(self._get_paired_fastq_files,result_type="expand")
+            df[["filename","filename2"]] = df.apply(lambda row: self._get_paired_fastq_files(row['sample_name']),axis=1,result_type="expand")
         else:
             df["filename"] = df["sample_name"].apply(self._get_fastq_file)
         return df
@@ -726,13 +744,15 @@ class NCBI:
             sra_df = sra_df[cols]
             if self.controls:
                 sra_df = sra_df[~sra_df['sample_name'].isin(self.controls.split("|"))] # weed out controls - we don't want to submit those
-            submittable = self.get_gisaid_submitted_samples()
+            # # NOTE: No longer submitting only samples with gisaid accessions. Use a filtered seq_report, if any samples shouldn't be submitted
+            # submittable = self.get_gisaid_submitted_samples()
             if not self.barcode_df.empty:
                 sra_df = sra_df.merge(self.barcode_df,on='sample_name',how="outer")
-            if not submittable=="all":
-                sra_df = sra_df[sra_df["sample_name"].isin(submittable)]
-            else:
-                sra_df = sra_df[sra_df["sample_name"].notna()]
+            # if not submittable=="all":
+            #     sra_df = sra_df[sra_df["sample_name"].isin(submittable)]
+            # else:
+            #     sra_df = sra_df[sra_df["sample_name"].notna()]
+            sra_df = sra_df[sra_df["sample_name"].notna()]
 
             # add derived attributes
             sra_df["library_ID"] = sra_df["sample_name"]
@@ -862,7 +882,8 @@ class NCBI:
     def write_genbank_fasta(self,outHandle):
         """Writes GenBank fasta seqs to provided outHandle"""
 
-        allowed_samples = self.getAllowedSamples(self.biosample["df"]["sample_name"].unique())
+        # # no longer filtering to only gisaid samples. Prefilter seq_report file if needed.
+        # # allowed_samples = self.getAllowedSamples(self.biosample["df"]["sample_name"].unique())
         added_samples = set()
         # write fasta
         for record in self.generate_updated_fasta_records():
@@ -994,7 +1015,8 @@ class NCBI:
         ignore_dates = True if sra_only else False
 
         # prepare/write TSVs
-        if self.plate is not None:
+        # if self.plate is not None: # old option. Not sure why I specified only if plate exists...
+        if self.plate is not None or self.subdir is not None:
             self.prep_dfs(ignore_dates=ignore_dates,require_biosample=require_biosample,add_biosample=True)
 
             # final_dfs = {} # NOTE: not necessary?

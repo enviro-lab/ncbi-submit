@@ -3,6 +3,12 @@
 ## Unreleased
 * nothing yet
 
+## v0.8.0
+### Added
+* can now edit how fastq files are discovered for each sample in config
+### Changed
+* fixed previously untested ability to submit paired reads
+
 ## v0.7.0
 ### Added
 * can now prepare/submit BioProject portion of XML (not yet tested with biosample/sra in the same submission, but it works alone)

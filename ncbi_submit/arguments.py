@@ -13,6 +13,8 @@ def add_file_prep_args(parser_file_prep:argparse.ArgumentParser):
         help="Path to sequencing report CSV")
     parser_file_prep.add_argument("--plate",required=False,
         help="Unique run or plate identifier")
+    parser_file_prep.add_argument("-s","--subdir",type=str,required=False,
+        help="Prefix for remote subdirectory where files will be uploaded. `db` and `attempt_num` will be added to form the full subdirectory name. If not provided, defaults to `--plate`")
     parser_file_prep.add_argument("--barcode_map",type=Path,required=False,default=None,
         help="Path to barcode map TSV. Used as reference to check that all samples are accounted for.")
     parser_file_prep.add_argument("--primer_map",type=Path,required=False,
@@ -229,10 +231,17 @@ def parse_args():
     p = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
     add_arguments(p)
     args = p.parse_args()
-    # set logging level, if needed
-    setattr(args,"logfile",args.outdir/'ncbi-submit.log')
-    args.logfile.parent.mkdir(exist_ok=True,parents=True)
-    args.outdir = ensure_outdir_viable(args.outdir)
-    logging.basicConfig(filename=args.logfile, encoding='utf-8', level=getattr(logging,args.log,None))
+
+    # a couple extra checks
     check_codependent_args(args)
+    args.outdir = ensure_outdir_viable(args.outdir)
+
+    # set logging level, if needed
+    logging_level = getattr(logging,args.log,None)
+    if logging_level:
+        setattr(args,"logfile",args.outdir/'ncbi-submit.log')
+        print("logfile:",args.logfile)
+        args.logfile.parent.mkdir(exist_ok=True,parents=True)
+        logging.basicConfig(filename=args.logfile, encoding='utf-8', level=logging_level)
+        # print("level:",logging.root.level)
     return args
