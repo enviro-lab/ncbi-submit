@@ -228,7 +228,7 @@ class BioSample_Action(SRA_BioSample_Action):
                         {self.biosample_link}
                       </SampleId>
                       <Descriptor>
-                        <Title>{self.ncbi.plate} BioSample</Title>
+                        <Title>{self.ncbi.plate if self.ncbi.plate else self.ncbi.subdir} BioSample</Title>
                       </Descriptor>
                       <Organism>
                         <OrganismName>{self.ncbi.biosample_presets["organism"]}</OrganismName>

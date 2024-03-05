@@ -3,6 +3,13 @@
 ## Unreleased
 * nothing yet
 
+## v0.8.1
+### Changed
+* primer scheme and associated fields are now optional
+* .fastq.gz files now work correctly for paired samples
+* reports (during `ncbi_submit check`) now come out in numerical rather than alphabetical order
+* submission title uses `subdir` if `plate` not provided
+
 ## v0.8.0
 ### Added
 * can now edit how fastq files are discovered for each sample in config

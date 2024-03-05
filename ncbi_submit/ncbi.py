@@ -61,6 +61,8 @@ class NCBI:
         self.extra_accessions = extra_accessions or cf.get("extra_accessions",None)
         self.suppressed_accessions = suppressed_accessions or cf.get("suppressed_accessions",None)
         self.fastq_finder = cf.get("sample_rename_to_find_fastqs",None)
+        self.skip_primer_scheme = cf.get("skip_primer_scheme",False)
+        self.force_submit_ready = cf.get("force_submit_ready",False)
 
         # varify files exist if provided
         for name,path in {"fastq_dir":fastq_dir,"seq_report":seq_report,"barcode_map":barcode_map,"gisaid_log":gisaid_log,"primer_map":primer_map,"fasta":fasta}.items():
@@ -650,7 +652,7 @@ class NCBI:
         possible_files:list[Path] = list(self.fastq_dir.glob(f"*{sample_name}*.fastq*"))
         if len(possible_files) == 2:
             if is_fastq(possible_files[0]) and is_fastq(possible_files[1]):
-                return possible_files
+                return [f.name for f in possible_files]
         elif len(possible_files) == 0:
             warn(f"Can't locate fastqs in {self.fastq_dir} via sample name '{sample_name}'.\n{self._offer_skip_option([sample_name])}.\nTo specify adjustments that need to be made to each `sample_name`, edit the function `sample_rename_to_find_fastqs(sample_name)` in your config file {self.config_file}")
         elif len(possible_files) == 1:
@@ -702,6 +704,8 @@ class NCBI:
                 elif len(self.allowed_schemes) == 1:
                     df["Primer Scheme"] = self.allowed_schemes[0]
                 else: raise AttributeError(f"'Primer Scheme' must be a field in your `seq_report` file '{self.primer_scheme}' \n or else one of the arguments `--primer_map` or `--primer_scheme` must be provided")
+        else:
+            raise AttributeError(f"'Primer Scheme' must be a field in the `primer_map` file '{self.primer_map}'. Alternatively, provide `primer_scheme` as an argument.")
         
         # verify primer schemes are allowed based on config
         if len(self.allowed_schemes) == 0: raise AttributeError(f"'allowed_schemes' must be specified in `config_file` '{self.config_file}'")
@@ -762,10 +766,11 @@ class NCBI:
             sra_df = self._addFilenames(sra_df)
             sra_df = sra_df.dropna(subset=["filename"])
             sra_df = sra_df[sra_df["filename"]!=None]
-            sra_df = self._add_primer_schemes(sra_df)
-            for col in ("amplicon_PCR_primer_scheme","design_description","sequencing_protocol_name"):
-                sra_df[col] = sra_df["Primer Scheme"].apply(lambda scheme: self.protocol_scheme[scheme][col])
-            sra_df = sra_df.drop(columns=["Primer Scheme"])
+            if not self.skip_primer_scheme:
+                sra_df = self._add_primer_schemes(sra_df)
+                for col in ("amplicon_PCR_primer_scheme","design_description","sequencing_protocol_name"):
+                    sra_df[col] = sra_df["Primer Scheme"].apply(lambda scheme: self.protocol_scheme[scheme][col])
+                sra_df = sra_df.drop(columns=["Primer Scheme"])
 
             # add `config_file` defaults/overrides
             for k,v in self.sra_presets.items():
@@ -780,6 +785,8 @@ class NCBI:
 
         # NOTE: this only allows for up to two filenames, at the moment
         # sra_df = sra_df[actual_cols] # NOTE doing this later (before writing tsv and xml)
+        if self.skip_primer_scheme:
+            required_sra_cols = [c for c in required_sra_cols if c not in ("amplicon_PCR_primer_scheme","sequencing_protocol_name","design_description")]
         check_missing(actual_cols,required_sra_cols,"SRA")
 
         logging.info("SRA")
@@ -1228,7 +1235,7 @@ class NCBI:
         """Creates submit.ready file, if anything was submitted"""
 
         # this file indicates to NCBI that the submission is ready to go
-        if not self.test_mode and self.uploaded_something:
+        if (not self.test_mode and self.uploaded_something) or self.force_submit_ready:
             print("Creating empty submit.ready file\n")
             with io.StringIO() as emptyFh:
                 emptyFh.write(u"")
@@ -1492,8 +1499,9 @@ class NCBI:
                 self.fullDatabaseReport()
 
                 # give full report for each report.*.xml file
-                for report_file in sorted([f for f in report_dir.glob("report*.xml") if f.name!="report.xml"]):
-                    self.fullStatusReport(report_file)
+                report_files = {int(f.suffixes[0].strip(".")):f for f in report_dir.glob("report*.xml") if f.name!="report.xml"}
+                for i in sorted(report_files):
+                    self.fullStatusReport(report_files[i])
 
             elif isEmpty:
                 print("No data yet submitted for",submission_dir)
